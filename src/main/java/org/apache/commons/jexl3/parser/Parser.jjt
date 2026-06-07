@@ -1242,13 +1242,19 @@ void IdentifierAccess() #void :
     |
         t=<JXLT_LITERAL> { jjtThis.setIdentifier(Parser.buildString(t.image, true), getScope()); } #IdentifierAccessJxlt
     )
-    |
+}
+
+void NullSafePropertyAccess() #void :
+{
+    Token t;
+}
+{
     <QDOT> (
-        t=<DOT_IDENTIFIER> { jjtThis.setIdentifier(t.image); } #IdentifierAccessSafe
+        t=<DOT_IDENTIFIER> { jjtThis.setIdentifier(t.image); } #NullSafePropertyAccess
     |
-        t=<STRING_LITERAL> { jjtThis.setIdentifier(Parser.buildString(t.image, true)); } #IdentifierAccessSafe
+        t=<STRING_LITERAL> { jjtThis.setIdentifier(Parser.buildString(t.image, true)); } #NullSafePropertyAccess
     |
-        t=<JXLT_LITERAL> { jjtThis.setIdentifier(Parser.buildString(t.image, true), getScope()); } #IdentifierAccessSafeJxlt
+        t=<JXLT_LITERAL> { jjtThis.setIdentifier(Parser.buildString(t.image, true), getScope()); } #NullSafePropertyAccessJxlt
     )
 }
 
@@ -1266,7 +1272,7 @@ void MemberAccess() #void : {}
     |
     LOOKAHEAD(<DOT>) IdentifierAccess()
     |
-    LOOKAHEAD(<QDOT>) IdentifierAccess()
+    LOOKAHEAD(<QDOT>) NullSafePropertyAccess()
 }
 
 void ReferenceExpression() #MethodNode(>1) : {}

@@ -1,0 +1,51 @@
+diff --git a/src/main/java/org/apache/commons/jexl3/internal/Interpreter.java b/src/main/java/org/apache/commons/jexl3/internal/Interpreter.java
+index 3d29d66a..b518b72e 100644
+--- a/src/main/java/org/apache/commons/jexl3/internal/Interpreter.java
++++ b/src/main/java/org/apache/commons/jexl3/internal/Interpreter.java
+@@ -1437,6 +1437,9 @@ public class Interpreter extends InterpreterBase {
+             return null;
+         }
+         final Object id = evalIdentifier(node);
++        if (id == null && node.isSafe()) {
++            return null;
++        }
+         return getAttribute(data, id, node);
+     }
+ 
+diff --git a/src/main/java/org/apache/commons/jexl3/parser/Parser.jjt b/src/main/java/org/apache/commons/jexl3/parser/Parser.jjt
+index 2d9eb1a2..69f7799c 100644
+--- a/src/main/java/org/apache/commons/jexl3/parser/Parser.jjt
++++ b/src/main/java/org/apache/commons/jexl3/parser/Parser.jjt
+@@ -1242,13 +1242,19 @@ void IdentifierAccess() #void :
+     |
+         t=<JXLT_LITERAL> { jjtThis.setIdentifier(Parser.buildString(t.image, true), getScope()); } #IdentifierAccessJxlt
+     )
+-    |
++}
++
++void NullSafePropertyAccess() #void :
++{
++    Token t;
++}
++{
+     <QDOT> (
+-        t=<DOT_IDENTIFIER> { jjtThis.setIdentifier(t.image); } #IdentifierAccessSafe
++        t=<DOT_IDENTIFIER> { jjtThis.setIdentifier(t.image); } #NullSafePropertyAccess
+     |
+-        t=<STRING_LITERAL> { jjtThis.setIdentifier(Parser.buildString(t.image, true)); } #IdentifierAccessSafe
++        t=<STRING_LITERAL> { jjtThis.setIdentifier(Parser.buildString(t.image, true)); } #NullSafePropertyAccess
+     |
+-        t=<JXLT_LITERAL> { jjtThis.setIdentifier(Parser.buildString(t.image, true), getScope()); } #IdentifierAccessSafeJxlt
++        t=<JXLT_LITERAL> { jjtThis.setIdentifier(Parser.buildString(t.image, true), getScope()); } #NullSafePropertyAccessJxlt
+     )
+ }
+ 
+@@ -1266,7 +1272,7 @@ void MemberAccess() #void : {}
+     |
+     LOOKAHEAD(<DOT>) IdentifierAccess()
+     |
+-    LOOKAHEAD(<QDOT>) IdentifierAccess()
++    LOOKAHEAD(<QDOT>) NullSafePropertyAccess()
+ }
+ 
+ void ReferenceExpression() #MethodNode(>1) : {}

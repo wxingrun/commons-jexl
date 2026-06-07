@@ -1437,6 +1437,9 @@ public class Interpreter extends InterpreterBase {
             return null;
         }
         final Object id = evalIdentifier(node);
+        if (id == null && node.isSafe()) {
+            return null;
+        }
         return getAttribute(data, id, node);
     }
 
