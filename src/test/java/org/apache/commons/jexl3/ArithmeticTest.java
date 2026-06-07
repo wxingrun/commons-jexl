@@ -2341,4 +2341,55 @@ class ArithmeticTest extends JexlTestCase {
             this.options = options;
         }
     }
+
+    @Test
+    void testBigIntegerWithLong() {
+        // Test BigInteger + Long
+        asserter.setVariable("bi", new BigInteger("9223372036854775808"));
+        asserter.assertExpression("bi + 1L", new BigInteger("9223372036854775809"));
+        
+        // Test Long + BigInteger
+        asserter.setVariable("bi", new BigInteger("42"));
+        asserter.assertExpression("100L + bi", new BigInteger("142"));
+        
+        // Test BigInteger - Long
+        asserter.setVariable("bi", new BigInteger("100"));
+        asserter.assertExpression("bi - 50L", new BigInteger("50"));
+        
+        // Test Long - BigInteger
+        asserter.setVariable("bi", new BigInteger("200"));
+        asserter.assertExpression("300L - bi", new BigInteger("100"));
+        
+        // Test BigInteger * Long
+        asserter.setVariable("bi", new BigInteger("2"));
+        asserter.assertExpression("bi * 100L", new BigInteger("200"));
+        
+        // Test Long * BigInteger
+        asserter.setVariable("bi", new BigInteger("3"));
+        asserter.assertExpression("50L * bi", new BigInteger("150"));
+        
+        // Test BigInteger / Long
+        asserter.setVariable("bi", new BigInteger("100"));
+        asserter.assertExpression("bi / 2L", new BigInteger("50"));
+        
+        // Test Long / BigInteger
+        asserter.setVariable("bi", new BigInteger("25"));
+        asserter.assertExpression("100L / bi", new BigInteger("4"));
+        
+        // Test BigInteger % Long
+        asserter.setVariable("bi", new BigInteger("10"));
+        asserter.assertExpression("bi % 3L", new BigInteger("1"));
+        
+        // Test Long % BigInteger
+        asserter.setVariable("bi", new BigInteger("5"));
+        asserter.assertExpression("10L % bi", new BigInteger("0"));
+        
+        // Test with negative values
+        asserter.setVariable("bi", new BigInteger("-10"));
+        asserter.assertExpression("bi + 5L", new BigInteger("-5"));
+        asserter.assertExpression("bi - 3L", new BigInteger("-13"));
+        asserter.assertExpression("bi * 2L", new BigInteger("-20"));
+        asserter.assertExpression("bi / 2L", new BigInteger("-5"));
+        asserter.assertExpression("bi % 3L", new BigInteger("-1"));
+    }
 }

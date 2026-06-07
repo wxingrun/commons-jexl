@@ -355,6 +355,13 @@ public class JexlArithmetic {
                     }
                     return narrowLong(left, right, result);
                 }
+                // if either are BigInteger, use that type
+                if (left instanceof BigInteger || right instanceof BigInteger) {
+                    final BigInteger l = toBigInteger(strictCast, left);
+                    final BigInteger r = toBigInteger(strictCast, right);
+                    final BigInteger result = l.add(r);
+                    return narrowBigInteger(left, right, result);
+                }
                 // if either are BigDecimal, use that type
                 if (left instanceof BigDecimal || right instanceof BigDecimal) {
                     final BigDecimal l = toBigDecimal(strictCast, left);
@@ -757,6 +764,16 @@ public class JexlArithmetic {
             }
             final long result = x  / y;
             return narrowLong(left, right, result);
+        }
+        // if either are BigInteger, use that type
+        if (left instanceof BigInteger || right instanceof BigInteger) {
+            final BigInteger l = toBigInteger(strictCast, left);
+            final BigInteger r = toBigInteger(strictCast, right);
+            if (BigInteger.ZERO.equals(r)) {
+                throw new ArithmeticException("/");
+            }
+            final BigInteger result = l.divide(r);
+            return narrowBigInteger(left, right, result);
         }
         // if either are BigDecimal, use that type
         if (left instanceof BigDecimal || right instanceof BigDecimal) {
@@ -1309,6 +1326,16 @@ public class JexlArithmetic {
             final long result = x % y;
             return narrowLong(left, right,  result);
         }
+        // if either are BigInteger, use that type
+        if (left instanceof BigInteger || right instanceof BigInteger) {
+            final BigInteger l = toBigInteger(strictCast, left);
+            final BigInteger r = toBigInteger(strictCast, right);
+            if (BigInteger.ZERO.equals(r)) {
+                throw new ArithmeticException("%");
+            }
+            final BigInteger result = l.mod(r);
+            return narrowBigInteger(left, right, result);
+        }
         // if either are BigDecimal, use that type
         if (left instanceof BigDecimal || right instanceof BigDecimal) {
             final BigDecimal l = toBigDecimal(strictCast, left);
@@ -1361,6 +1388,13 @@ public class JexlArithmetic {
                 return BigInteger.valueOf(x).multiply(BigInteger.valueOf(y));
             }
             return narrowLong(left, right, result);
+        }
+        // if either are BigInteger, use that type
+        if (left instanceof BigInteger || right instanceof BigInteger) {
+            final BigInteger l = toBigInteger(strictCast, left);
+            final BigInteger r = toBigInteger(strictCast, right);
+            final BigInteger result = l.multiply(r);
+            return narrowBigInteger(left, right, result);
         }
         // if either are BigDecimal, use that type
         if (left instanceof BigDecimal || right instanceof BigDecimal) {
@@ -2048,6 +2082,13 @@ public class JexlArithmetic {
                 return BigInteger.valueOf(x).subtract(BigInteger.valueOf(y));
             }
             return narrowLong(left, right, result);
+        }
+        // if either are BigInteger, use that type
+        if (left instanceof BigInteger || right instanceof BigInteger) {
+            final BigInteger l = toBigInteger(strictCast, left);
+            final BigInteger r = toBigInteger(strictCast, right);
+            final BigInteger result = l.subtract(r);
+            return narrowBigInteger(left, right, result);
         }
         // if either are BigDecimal, use that type
         if (left instanceof BigDecimal || right instanceof BigDecimal) {

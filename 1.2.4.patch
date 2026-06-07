@@ -1,0 +1,140 @@
+diff --git a/src/main/java/org/apache/commons/jexl3/JexlArithmetic.java b/src/main/java/org/apache/commons/jexl3/JexlArithmetic.java
+index 140bf495..0c379bb5 100644
+--- a/src/main/java/org/apache/commons/jexl3/JexlArithmetic.java
++++ b/src/main/java/org/apache/commons/jexl3/JexlArithmetic.java
+@@ -355,6 +355,13 @@ public class JexlArithmetic {
+                     }
+                     return narrowLong(left, right, result);
+                 }
++                // if either are BigInteger, use that type
++                if (left instanceof BigInteger || right instanceof BigInteger) {
++                    final BigInteger l = toBigInteger(strictCast, left);
++                    final BigInteger r = toBigInteger(strictCast, right);
++                    final BigInteger result = l.add(r);
++                    return narrowBigInteger(left, right, result);
++                }
+                 // if either are BigDecimal, use that type
+                 if (left instanceof BigDecimal || right instanceof BigDecimal) {
+                     final BigDecimal l = toBigDecimal(strictCast, left);
+@@ -758,6 +765,16 @@ public class JexlArithmetic {
+             final long result = x  / y;
+             return narrowLong(left, right, result);
+         }
++        // if either are BigInteger, use that type
++        if (left instanceof BigInteger || right instanceof BigInteger) {
++            final BigInteger l = toBigInteger(strictCast, left);
++            final BigInteger r = toBigInteger(strictCast, right);
++            if (BigInteger.ZERO.equals(r)) {
++                throw new ArithmeticException("/");
++            }
++            final BigInteger result = l.divide(r);
++            return narrowBigInteger(left, right, result);
++        }
+         // if either are BigDecimal, use that type
+         if (left instanceof BigDecimal || right instanceof BigDecimal) {
+             final BigDecimal l = toBigDecimal(strictCast, left);
+@@ -1309,6 +1326,16 @@ public class JexlArithmetic {
+             final long result = x % y;
+             return narrowLong(left, right,  result);
+         }
++        // if either are BigInteger, use that type
++        if (left instanceof BigInteger || right instanceof BigInteger) {
++            final BigInteger l = toBigInteger(strictCast, left);
++            final BigInteger r = toBigInteger(strictCast, right);
++            if (BigInteger.ZERO.equals(r)) {
++                throw new ArithmeticException("%");
++            }
++            final BigInteger result = l.mod(r);
++            return narrowBigInteger(left, right, result);
++        }
+         // if either are BigDecimal, use that type
+         if (left instanceof BigDecimal || right instanceof BigDecimal) {
+             final BigDecimal l = toBigDecimal(strictCast, left);
+@@ -1362,6 +1389,13 @@ public class JexlArithmetic {
+             }
+             return narrowLong(left, right, result);
+         }
++        // if either are BigInteger, use that type
++        if (left instanceof BigInteger || right instanceof BigInteger) {
++            final BigInteger l = toBigInteger(strictCast, left);
++            final BigInteger r = toBigInteger(strictCast, right);
++            final BigInteger result = l.multiply(r);
++            return narrowBigInteger(left, right, result);
++        }
+         // if either are BigDecimal, use that type
+         if (left instanceof BigDecimal || right instanceof BigDecimal) {
+             final BigDecimal l = toBigDecimal(strictCast, left);
+@@ -2049,6 +2083,13 @@ public class JexlArithmetic {
+             }
+             return narrowLong(left, right, result);
+         }
++        // if either are BigInteger, use that type
++        if (left instanceof BigInteger || right instanceof BigInteger) {
++            final BigInteger l = toBigInteger(strictCast, left);
++            final BigInteger r = toBigInteger(strictCast, right);
++            final BigInteger result = l.subtract(r);
++            return narrowBigInteger(left, right, result);
++        }
+         // if either are BigDecimal, use that type
+         if (left instanceof BigDecimal || right instanceof BigDecimal) {
+             final BigDecimal l = toBigDecimal(strictCast, left);
+diff --git a/src/test/java/org/apache/commons/jexl3/ArithmeticTest.java b/src/test/java/org/apache/commons/jexl3/ArithmeticTest.java
+index 21b903cc..2eb93e3e 100644
+--- a/src/test/java/org/apache/commons/jexl3/ArithmeticTest.java
++++ b/src/test/java/org/apache/commons/jexl3/ArithmeticTest.java
+@@ -2341,4 +2341,55 @@ class ArithmeticTest extends JexlTestCase {
+             this.options = options;
+         }
+     }
++
++    @Test
++    void testBigIntegerWithLong() {
++        // Test BigInteger + Long
++        asserter.setVariable("bi", new BigInteger("9223372036854775808"));
++        asserter.assertExpression("bi + 1L", new BigInteger("9223372036854775809"));
++        
++        // Test Long + BigInteger
++        asserter.setVariable("bi", new BigInteger("42"));
++        asserter.assertExpression("100L + bi", new BigInteger("142"));
++        
++        // Test BigInteger - Long
++        asserter.setVariable("bi", new BigInteger("100"));
++        asserter.assertExpression("bi - 50L", new BigInteger("50"));
++        
++        // Test Long - BigInteger
++        asserter.setVariable("bi", new BigInteger("200"));
++        asserter.assertExpression("300L - bi", new BigInteger("100"));
++        
++        // Test BigInteger * Long
++        asserter.setVariable("bi", new BigInteger("2"));
++        asserter.assertExpression("bi * 100L", new BigInteger("200"));
++        
++        // Test Long * BigInteger
++        asserter.setVariable("bi", new BigInteger("3"));
++        asserter.assertExpression("50L * bi", new BigInteger("150"));
++        
++        // Test BigInteger / Long
++        asserter.setVariable("bi", new BigInteger("100"));
++        asserter.assertExpression("bi / 2L", new BigInteger("50"));
++        
++        // Test Long / BigInteger
++        asserter.setVariable("bi", new BigInteger("25"));
++        asserter.assertExpression("100L / bi", new BigInteger("4"));
++        
++        // Test BigInteger % Long
++        asserter.setVariable("bi", new BigInteger("10"));
++        asserter.assertExpression("bi % 3L", new BigInteger("1"));
++        
++        // Test Long % BigInteger
++        asserter.setVariable("bi", new BigInteger("5"));
++        asserter.assertExpression("10L % bi", new BigInteger("0"));
++        
++        // Test with negative values
++        asserter.setVariable("bi", new BigInteger("-10"));
++        asserter.assertExpression("bi + 5L", new BigInteger("-5"));
++        asserter.assertExpression("bi - 3L", new BigInteger("-13"));
++        asserter.assertExpression("bi * 2L", new BigInteger("-20"));
++        asserter.assertExpression("bi / 2L", new BigInteger("-5"));
++        asserter.assertExpression("bi % 3L", new BigInteger("-1"));
++    }
+ }
