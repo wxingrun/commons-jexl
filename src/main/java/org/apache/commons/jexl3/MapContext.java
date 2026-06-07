@@ -68,4 +68,16 @@ public class MapContext implements JexlContext {
     public void set(final String name, final Object value) {
         map.put(name, value);
     }
+
+    /**
+     * Sets a number of variables.
+     *
+     * @param variables the variables to set
+     */
+    public void putAll(final Map<String, Object> variables) {
+        if (variables == null) {
+            throw new NullPointerException("variables must not be null");
+        }
+        map.putAll(variables);
+    }
 }
