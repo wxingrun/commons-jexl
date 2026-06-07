@@ -19,6 +19,7 @@ package org.apache.commons.jexl3;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Wraps a map in a context.
@@ -62,6 +63,16 @@ public class MapContext implements JexlContext {
     @Override
     public boolean has(final String name) {
         return map.containsKey(name);
+    }
+
+    /**
+     * Adds all variables from the given map to this context.
+     *
+     * @param variables the variables to add
+     * @throws NullPointerException if variables is null
+     */
+    public void putAll(final Map<String, Object> variables) {
+        map.putAll(Objects.requireNonNull(variables, "variables"));
     }
 
     @Override
