@@ -1,0 +1,103 @@
+diff --git a/src/main/java/org/apache/commons/jexl3/internal/introspection/Permissions.java b/src/main/java/org/apache/commons/jexl3/internal/introspection/Permissions.java
+index b5d15988..41a57127 100644
+--- a/src/main/java/org/apache/commons/jexl3/internal/introspection/Permissions.java
++++ b/src/main/java/org/apache/commons/jexl3/internal/introspection/Permissions.java
+@@ -278,7 +278,56 @@ public class Permissions implements JexlPermissions {
+      */
+     @Override
+     public Permissions compose(final String... src) {
+-        return new PermissionsParser().parse(new HashSet<>(allowed), copyMap(packages), src);
++        Set<String> newAllowed = new HashSet<>(this.allowed);
++        Map<String, NoJexlPackage> newPackages = copyMap(this.packages);
++        
++        for (String rule : src) {
++            Permissions parsed = new PermissionsParser().parse(rule);
++            
++            // 1. Process parsed wildcards
++            for (String inc : parsed.getWildcards()) {
++                newPackages.keySet().removeIf(pkg -> isCoveredByWildcard(inc, pkg));
++                newAllowed.removeIf(existing -> isCoveredByWildcard(inc, existing));
++                newAllowed.add(inc);
++            }
++            
++            // 2. Process parsed packages
++            for (Map.Entry<String, NoJexlPackage> entry : parsed.getPackages().entrySet()) {
++                newPackages.put(entry.getKey(), entry.getValue());
++            }
++        }
++        
++        // Final cleanup of redundant wildcards
++        Set<String> cleanAllowed = new HashSet<>();
++        for (String w1 : newAllowed) {
++            boolean covered = false;
++            for (String w2 : newAllowed) {
++                if (!w1.equals(w2) && isCoveredByWildcard(w2, w1)) {
++                    covered = true;
++                    break;
++                }
++            }
++            if (!covered) {
++                cleanAllowed.add(w1);
++            }
++        }
++        
++        return new Permissions(cleanAllowed, newPackages);
++    }
++
++    /**
++     * Checks if a target (package or wildcard) is covered by a wildcard.
++     * @param wildcard the wildcard (e.g. "java.util.*")
++     * @param target the target (e.g. "java.util.Map" or "java.util.Map.*")
++     * @return true if covered
++     */
++    private boolean isCoveredByWildcard(String wildcard, String target) {
++        if (wildcard == null || !wildcard.endsWith(".*")) {
++            return false;
++        }
++        String prefix = wildcard.substring(0, wildcard.length() - 2);
++        String targetName = target.endsWith(".*") ? target.substring(0, target.length() - 2) : target;
++        return targetName.equals(prefix) || targetName.startsWith(prefix + ".");
+     }
+ 
+     /**
+diff --git a/src/test/java/org/apache/commons/jexl3/internal/introspection/PermissionsTest.java b/src/test/java/org/apache/commons/jexl3/internal/introspection/PermissionsTest.java
+index 4897deb8..8b9789b4 100644
+--- a/src/test/java/org/apache/commons/jexl3/internal/introspection/PermissionsTest.java
++++ b/src/test/java/org/apache/commons/jexl3/internal/introspection/PermissionsTest.java
+@@ -592,4 +592,36 @@ class PermissionsTest {
+             }
+         }
+     }
++
++    @Test
++    void testMergeRulesInclusion() {
++        // "java.util.*" includes "java.util.concurrent.*"
++        JexlPermissions p = JexlPermissions.parse().compose("java.util.*", "java.util.concurrent.*");
++        assertTrue(p.allow(java.util.Map.class));
++        assertTrue(p.allow(java.util.concurrent.ConcurrentHashMap.class));
++        
++        Permissions permissions = (Permissions) p;
++        assertEquals(1, permissions.getWildcards().size());
++        assertTrue(permissions.getWildcards().contains("java.util.*"));
++    }
++
++    @Test
++    void testMergeRulesOrderOverride1() {
++        // Later rule overrides earlier rule
++        // 1. allow java.util.*
++        // 2. deny java.util.Map
++        JexlPermissions p = JexlPermissions.parse().compose("java.util.*", "java.util { Map {} }");
++        assertTrue(p.allow(java.util.List.class));
++        assertFalse(p.allow(java.util.Map.class));
++    }
++
++    @Test
++    void testMergeRulesOrderOverride2() {
++        // Later rule overrides earlier rule
++        // 1. deny java.util.Map
++        // 2. allow java.util.*
++        JexlPermissions p = JexlPermissions.parse().compose("java.util { Map {} }", "java.util.*");
++        assertTrue(p.allow(java.util.List.class));
++        assertTrue(p.allow(java.util.Map.class)); // The wildcard overrides the specific package denial
++    }
+ }

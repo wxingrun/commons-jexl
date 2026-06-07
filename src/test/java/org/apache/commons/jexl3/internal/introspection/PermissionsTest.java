@@ -592,4 +592,36 @@ class PermissionsTest {
             }
         }
     }
+
+    @Test
+    void testMergeRulesInclusion() {
+        // "java.util.*" includes "java.util.concurrent.*"
+        JexlPermissions p = JexlPermissions.parse().compose("java.util.*", "java.util.concurrent.*");
+        assertTrue(p.allow(java.util.Map.class));
+        assertTrue(p.allow(java.util.concurrent.ConcurrentHashMap.class));
+        
+        Permissions permissions = (Permissions) p;
+        assertEquals(1, permissions.getWildcards().size());
+        assertTrue(permissions.getWildcards().contains("java.util.*"));
+    }
+
+    @Test
+    void testMergeRulesOrderOverride1() {
+        // Later rule overrides earlier rule
+        // 1. allow java.util.*
+        // 2. deny java.util.Map
+        JexlPermissions p = JexlPermissions.parse().compose("java.util.*", "java.util { Map {} }");
+        assertTrue(p.allow(java.util.List.class));
+        assertFalse(p.allow(java.util.Map.class));
+    }
+
+    @Test
+    void testMergeRulesOrderOverride2() {
+        // Later rule overrides earlier rule
+        // 1. deny java.util.Map
+        // 2. allow java.util.*
+        JexlPermissions p = JexlPermissions.parse().compose("java.util { Map {} }", "java.util.*");
+        assertTrue(p.allow(java.util.List.class));
+        assertTrue(p.allow(java.util.Map.class)); // The wildcard overrides the specific package denial
+    }
 }

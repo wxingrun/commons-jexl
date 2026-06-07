@@ -278,7 +278,56 @@ public class Permissions implements JexlPermissions {
      */
     @Override
     public Permissions compose(final String... src) {
-        return new PermissionsParser().parse(new HashSet<>(allowed), copyMap(packages), src);
+        Set<String> newAllowed = new HashSet<>(this.allowed);
+        Map<String, NoJexlPackage> newPackages = copyMap(this.packages);
+        
+        for (String rule : src) {
+            Permissions parsed = new PermissionsParser().parse(rule);
+            
+            // 1. Process parsed wildcards
+            for (String inc : parsed.getWildcards()) {
+                newPackages.keySet().removeIf(pkg -> isCoveredByWildcard(inc, pkg));
+                newAllowed.removeIf(existing -> isCoveredByWildcard(inc, existing));
+                newAllowed.add(inc);
+            }
+            
+            // 2. Process parsed packages
+            for (Map.Entry<String, NoJexlPackage> entry : parsed.getPackages().entrySet()) {
+                newPackages.put(entry.getKey(), entry.getValue());
+            }
+        }
+        
+        // Final cleanup of redundant wildcards
+        Set<String> cleanAllowed = new HashSet<>();
+        for (String w1 : newAllowed) {
+            boolean covered = false;
+            for (String w2 : newAllowed) {
+                if (!w1.equals(w2) && isCoveredByWildcard(w2, w1)) {
+                    covered = true;
+                    break;
+                }
+            }
+            if (!covered) {
+                cleanAllowed.add(w1);
+            }
+        }
+        
+        return new Permissions(cleanAllowed, newPackages);
+    }
+
+    /**
+     * Checks if a target (package or wildcard) is covered by a wildcard.
+     * @param wildcard the wildcard (e.g. "java.util.*")
+     * @param target the target (e.g. "java.util.Map" or "java.util.Map.*")
+     * @return true if covered
+     */
+    private boolean isCoveredByWildcard(String wildcard, String target) {
+        if (wildcard == null || !wildcard.endsWith(".*")) {
+            return false;
+        }
+        String prefix = wildcard.substring(0, wildcard.length() - 2);
+        String targetName = target.endsWith(".*") ? target.substring(0, target.length() - 2) : target;
+        return targetName.equals(prefix) || targetName.startsWith(prefix + ".");
     }
 
     /**
