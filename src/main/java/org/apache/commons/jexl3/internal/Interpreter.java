@@ -192,11 +192,13 @@ public class Interpreter extends InterpreterBase {
             // ...(x)(y)
             methodName = null;
             cacheable = false;
-        } else if (!node.isSafeLhs(isSafe())) {
-            return unsolvableMethod(node, "?(...)");
-        } else {
+        } else if (node.jjtGetNumChildren() > 0 
+                && node.jjtGetChild(0) instanceof ASTIdentifierAccess 
+                && (((ASTIdentifierAccess) node.jjtGetChild(0)).isSafe() || isSafe())) {
             // safe lhs
             return null;
+        } else {
+            return unsolvableMethod(node, "?(...)");
         }
 
         // solving the call site
@@ -1589,7 +1591,10 @@ public class Interpreter extends InterpreterBase {
                 object = data;
                 if (object == null) {
                     // no object, we fail
-                    return node.isSafeLhs(isSafe())
+                    boolean safe = node.jjtGetNumChildren() > 0 
+                        && node.jjtGetChild(0) instanceof ASTIdentifierAccess 
+                        && (((ASTIdentifierAccess) node.jjtGetChild(0)).isSafe() || isSafe());
+                    return safe
                         ? null
                         : unsolvableMethod(methodNode, "<null>.<?>(...)");
                 }
@@ -1847,7 +1852,7 @@ public class Interpreter extends InterpreterBase {
         // dealing with null
         if (object == null) {
             if (ptyNode != null) {
-                if (ptyNode.isSafeLhs(isSafe())) {
+                if (objectNode.isSafeLhs(isSafe())) {
                     return null;
                 }
                 if (ant != null) {

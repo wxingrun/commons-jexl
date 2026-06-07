@@ -268,13 +268,6 @@ public abstract class JexlNode extends SimpleNode implements JexlCache.Reference
         if (this instanceof ASTReference) {
             return jjtGetChild(0).isSafeLhs(safe);
         }
-        if (this instanceof ASTMethodNode) {
-            if (jjtGetNumChildren() > 1
-                    && jjtGetChild(0) instanceof ASTIdentifierAccess
-                    && (((ASTIdentifierAccess) jjtGetChild(0)).isSafe() || safe)) {
-                return true;
-            }
-        }
         final JexlNode parent = jjtGetParent();
         if (parent == null) {
             return false;
@@ -301,7 +294,7 @@ public abstract class JexlNode extends SimpleNode implements JexlCache.Reference
                 return true;
             }
             if (rsibling instanceof ASTArrayAccess) {
-                return safe;
+                return ((ASTArrayAccess) rsibling).isSafeChild(0) || safe;
             }
         }
         return false;

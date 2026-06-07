@@ -1,0 +1,82 @@
+diff --git a/src/main/java/org/apache/commons/jexl3/internal/Interpreter.java b/src/main/java/org/apache/commons/jexl3/internal/Interpreter.java
+index 3d29d66a..07dd0980 100644
+--- a/src/main/java/org/apache/commons/jexl3/internal/Interpreter.java
++++ b/src/main/java/org/apache/commons/jexl3/internal/Interpreter.java
+@@ -192,11 +192,13 @@ public class Interpreter extends InterpreterBase {
+             // ...(x)(y)
+             methodName = null;
+             cacheable = false;
+-        } else if (!node.isSafeLhs(isSafe())) {
+-            return unsolvableMethod(node, "?(...)");
+-        } else {
++        } else if (node.jjtGetNumChildren() > 0 
++                && node.jjtGetChild(0) instanceof ASTIdentifierAccess 
++                && (((ASTIdentifierAccess) node.jjtGetChild(0)).isSafe() || isSafe())) {
+             // safe lhs
+             return null;
++        } else {
++            return unsolvableMethod(node, "?(...)");
+         }
+ 
+         // solving the call site
+@@ -1589,7 +1591,10 @@ public class Interpreter extends InterpreterBase {
+                 object = data;
+                 if (object == null) {
+                     // no object, we fail
+-                    return node.isSafeLhs(isSafe())
++                    boolean safe = node.jjtGetNumChildren() > 0 
++                        && node.jjtGetChild(0) instanceof ASTIdentifierAccess 
++                        && (((ASTIdentifierAccess) node.jjtGetChild(0)).isSafe() || isSafe());
++                    return safe
+                         ? null
+                         : unsolvableMethod(methodNode, "<null>.<?>(...)");
+                 }
+@@ -1847,7 +1852,7 @@ public class Interpreter extends InterpreterBase {
+         // dealing with null
+         if (object == null) {
+             if (ptyNode != null) {
+-                if (ptyNode.isSafeLhs(isSafe())) {
++                if (objectNode.isSafeLhs(isSafe())) {
+                     return null;
+                 }
+                 if (ant != null) {
+diff --git a/src/main/java/org/apache/commons/jexl3/parser/ASTArrayAccess.java b/src/main/java/org/apache/commons/jexl3/parser/ASTArrayAccess.java
+index c3254856..dd3178e8 100644
+--- a/src/main/java/org/apache/commons/jexl3/parser/ASTArrayAccess.java
++++ b/src/main/java/org/apache/commons/jexl3/parser/ASTArrayAccess.java
+@@ -43,7 +43,7 @@ public class ASTArrayAccess extends JexlLexicalNode {
+ 
+   @Override
+   public boolean isSafeLhs(final boolean safe) {
+-    return isSafeChild(0) || super.isSafeLhs(safe);
++    return super.isSafeLhs(safe);
+   }
+ 
+   @Override
+diff --git a/src/main/java/org/apache/commons/jexl3/parser/JexlNode.java b/src/main/java/org/apache/commons/jexl3/parser/JexlNode.java
+index f9a3e186..b9c21d79 100644
+--- a/src/main/java/org/apache/commons/jexl3/parser/JexlNode.java
++++ b/src/main/java/org/apache/commons/jexl3/parser/JexlNode.java
+@@ -268,13 +268,6 @@ public abstract class JexlNode extends SimpleNode implements JexlCache.Reference
+         if (this instanceof ASTReference) {
+             return jjtGetChild(0).isSafeLhs(safe);
+         }
+-        if (this instanceof ASTMethodNode) {
+-            if (jjtGetNumChildren() > 1
+-                    && jjtGetChild(0) instanceof ASTIdentifierAccess
+-                    && (((ASTIdentifierAccess) jjtGetChild(0)).isSafe() || safe)) {
+-                return true;
+-            }
+-        }
+         final JexlNode parent = jjtGetParent();
+         if (parent == null) {
+             return false;
+@@ -301,7 +294,7 @@ public abstract class JexlNode extends SimpleNode implements JexlCache.Reference
+                 return true;
+             }
+             if (rsibling instanceof ASTArrayAccess) {
+-                return safe;
++                return ((ASTArrayAccess) rsibling).isSafeChild(0) || safe;
+             }
+         }
+         return false;
