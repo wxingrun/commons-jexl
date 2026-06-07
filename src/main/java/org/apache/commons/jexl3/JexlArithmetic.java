@@ -51,6 +51,7 @@ import org.apache.commons.logging.Log;
  *   result to the most precise argument class ({@code boolean < byte < short < int < long});
  *   if long operation would cause overflow, return a BigInteger</li>
  *   <li>If either argument is a BigDecimal, coerce both to BigDecimal, operator returns BigDecimal</li>
+ *   <li>If either argument is a BigInteger, coerce both to BigInteger, operator returns BigInteger</li>
  *   <li>If either argument is a floating point number, coerce both to Double, operator returns Double</li>
  *   <li>Else treat as BigInteger, perform operation and narrow result to the most precise argument class
  *   </li>
@@ -360,6 +361,13 @@ public class JexlArithmetic {
                     final BigDecimal l = toBigDecimal(strictCast, left);
                     final BigDecimal r = toBigDecimal(strictCast, right);
                     return l.add(r, getMathContext());
+                }
+                // if either are BigInteger, use that type
+                if (left instanceof BigInteger || right instanceof BigInteger) {
+                    final BigInteger l = toBigInteger(strictCast, left);
+                    final BigInteger r = toBigInteger(strictCast, right);
+                    final BigInteger result = l.add(r);
+                    return narrowBigInteger(left, right, result);
                 }
                 // if either are floating point (double or float), use double
                 if (isFloatingPointNumber(left) || isFloatingPointNumber(right)) {
@@ -766,6 +774,16 @@ public class JexlArithmetic {
                 throw new ArithmeticException("/");
             }
             return l.divide(r, getMathContext());
+        }
+        // if either are BigInteger, use that type
+        if (left instanceof BigInteger || right instanceof BigInteger) {
+            final BigInteger l = toBigInteger(strictCast, left);
+            final BigInteger r = toBigInteger(strictCast, right);
+            if (BigInteger.ZERO.equals(r)) {
+                throw new ArithmeticException("/");
+            }
+            final BigInteger result = l.divide(r);
+            return narrowBigInteger(left, right, result);
         }
         // if either are floating point (double or float), use double
         if (isFloatingPointNumber(left) || isFloatingPointNumber(right)) {
@@ -1318,6 +1336,16 @@ public class JexlArithmetic {
             }
             return l.remainder(r, getMathContext());
         }
+        // if either are BigInteger, use that type
+        if (left instanceof BigInteger || right instanceof BigInteger) {
+            final BigInteger l = toBigInteger(strictCast, left);
+            final BigInteger r = toBigInteger(strictCast, right);
+            if (BigInteger.ZERO.equals(r)) {
+                throw new ArithmeticException("%");
+            }
+            final BigInteger result = l.mod(r);
+            return narrowBigInteger(left, right, result);
+        }
         // if either are floating point (double or float), use double
         if (isFloatingPointNumber(left) || isFloatingPointNumber(right)) {
             final double l = toDouble(strictCast, left);
@@ -1367,6 +1395,13 @@ public class JexlArithmetic {
             final BigDecimal l = toBigDecimal(strictCast, left);
             final BigDecimal r = toBigDecimal(strictCast, right);
             return l.multiply(r, getMathContext());
+        }
+        // if either are BigInteger, use that type
+        if (left instanceof BigInteger || right instanceof BigInteger) {
+            final BigInteger l = toBigInteger(strictCast, left);
+            final BigInteger r = toBigInteger(strictCast, right);
+            final BigInteger result = l.multiply(r);
+            return narrowBigInteger(left, right, result);
         }
         // if either are floating point (double or float), use double
         if (isFloatingPointNumber(left) || isFloatingPointNumber(right)) {
@@ -2054,6 +2089,13 @@ public class JexlArithmetic {
             final BigDecimal l = toBigDecimal(strictCast, left);
             final BigDecimal r = toBigDecimal(strictCast, right);
             return l.subtract(r, getMathContext());
+        }
+        // if either are BigInteger, use that type
+        if (left instanceof BigInteger || right instanceof BigInteger) {
+            final BigInteger l = toBigInteger(strictCast, left);
+            final BigInteger r = toBigInteger(strictCast, right);
+            final BigInteger result = l.subtract(r);
+            return narrowBigInteger(left, right, result);
         }
         // if either are floating point (double or float), use double
         if (isFloatingPointNumber(left) || isFloatingPointNumber(right)) {

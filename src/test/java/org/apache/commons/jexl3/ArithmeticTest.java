@@ -1885,6 +1885,59 @@ class ArithmeticTest extends JexlTestCase {
     }
 
     @Test
+    void testBigIntegerLongMixedArithmetic() throws Exception {
+        final BigInteger bigValue = new BigInteger("9223372036854775808");
+        asserter.setVariable("bigValue", bigValue);
+        asserter.assertExpression("bigValue + 1L", new BigInteger("9223372036854775809"));
+        asserter.assertExpression("bigValue - 1L", new BigInteger("9223372036854775807"));
+        asserter.assertExpression("bigValue * 2L", new BigInteger("18446744073709551616"));
+        asserter.assertExpression("bigValue / 2L", new BigInteger("4611686018427387904"));
+        asserter.assertExpression("bigValue % 1000000L", new BigInteger("775808"));
+    }
+
+    @Test
+    void testBigIntegerLongMixedArithmeticOverflow() throws Exception {
+        final BigInteger bigValue = new BigInteger("9223372036854775808");
+        asserter.setVariable("bigValue", bigValue);
+        asserter.assertExpression("bigValue + 9223372036854775807", new BigInteger("18446744073709551615"));
+        asserter.assertExpression("bigValue - (-9223372036854775808)", new BigInteger("18446744073709551616"));
+        asserter.assertExpression("bigValue * 3", new BigInteger("27670116110564327424"));
+        asserter.assertExpression("bigValue + 0L", bigValue);
+        asserter.assertExpression("bigValue - 0L", bigValue);
+    }
+
+    @Test
+    void testBigIntegerLongMixedArithmeticSmallValues() throws Exception {
+        asserter.setVariable("bi", new BigInteger("100"));
+        asserter.assertExpression("bi + 50L", 150);
+        asserter.assertExpression("bi - 50L", 50);
+        asserter.assertExpression("bi * 3L", 300);
+        asserter.assertExpression("bi / 3L", 33);
+        asserter.assertExpression("bi % 7L", 2);
+    }
+
+    @Test
+    void testBigIntegerIntMixedArithmetic() throws Exception {
+        asserter.setVariable("bi", new BigInteger("100"));
+        asserter.assertExpression("bi + 50", 150);
+        asserter.assertExpression("bi - 50", 50);
+        asserter.assertExpression("bi * 3", 300);
+        asserter.assertExpression("bi / 3", 33);
+        asserter.assertExpression("bi % 7", 2);
+    }
+
+    @Test
+    void testBigIntegerLongMixedArithmeticNegative() throws Exception {
+        final BigInteger bigNegative = new BigInteger("-9223372036854775809");
+        asserter.setVariable("bigNegative", bigNegative);
+        asserter.assertExpression("bigNegative + 1L", new BigInteger("-9223372036854775808"));
+        asserter.assertExpression("bigNegative - 1L", new BigInteger("-9223372036854775810"));
+        asserter.assertExpression("bigNegative * 2L", new BigInteger("-18446744073709551618"));
+        asserter.assertExpression("bigNegative / 2L", new BigInteger("-4611686018427387904"));
+        asserter.assertExpression("bigNegative % 1000000L", new BigInteger("-775809"));
+    }
+
+    @Test
     void testNullArgs() {
         final JexlEngine jexl =  new JexlBuilder().arithmetic(new JexlArithmetic(true) {
             @Override public boolean isStrict(final JexlOperator op) {
