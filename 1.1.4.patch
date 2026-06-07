@@ -1,0 +1,102 @@
+diff --git a/src/main/java/org/apache/commons/jexl3/internal/introspection/PermissionsParser.java b/src/main/java/org/apache/commons/jexl3/internal/introspection/PermissionsParser.java
+index a5631002..e15a4787 100644
+--- a/src/main/java/org/apache/commons/jexl3/internal/introspection/PermissionsParser.java
++++ b/src/main/java/org/apache/commons/jexl3/internal/introspection/PermissionsParser.java
+@@ -337,7 +337,7 @@ public class PermissionsParser {
+                     i = next;
+                     // consume it if it is a wildcard declaration
+                     if (pname.endsWith(".*")) {
+-                        wildcards.add(pname);
++                        addWildcardWithMerge(pname);
+                         pname = null;
+                     }
+                     continue;
+@@ -412,6 +412,34 @@ public class PermissionsParser {
+         return offset;
+     }
+ 
++    /**
++     * Adds a wildcard to the set, merging existing rules that are included by or include the new rule.
++     * The later rule overrides the earlier one.
++     *
++     * @param wildcard the wildcard rule to add
++     */
++    private void addWildcardWithMerge(String wildcard) {
++        // Extract the base part without the ".*"
++        String baseWildcard = wildcard.substring(0, wildcard.length() - 2);
++
++        // Iterate over a copy to avoid ConcurrentModificationException
++        Set<String> existingWildcards = new java.util.HashSet<>(wildcards);
++
++        for (String existing : existingWildcards) {
++            String baseExisting = existing.substring(0, existing.length() - 2);
++
++            // Check if the new wildcard includes the existing one, or if existing includes the new one
++            // In either case, remove the existing one since later rule overrides earlier
++            if (baseExisting.startsWith(baseWildcard + ".") || baseExisting.equals(baseWildcard) || 
++                baseWildcard.startsWith(baseExisting + ".") || baseWildcard.equals(baseExisting)) {
++                wildcards.remove(existing);
++            }
++        }
++
++        // Always add the new wildcard since it's the later one and overrides earlier ones
++        wildcards.add(wildcard);
++    }
++
+     /**
+      * Compose a parsing error message.
+      *
+diff --git a/src/test/java/org/apache/commons/jexl3/internal/introspection/PermissionsTest.java b/src/test/java/org/apache/commons/jexl3/internal/introspection/PermissionsTest.java
+index 4897deb8..6478f802 100644
+--- a/src/test/java/org/apache/commons/jexl3/internal/introspection/PermissionsTest.java
++++ b/src/test/java/org/apache/commons/jexl3/internal/introspection/PermissionsTest.java
+@@ -501,6 +501,49 @@ class PermissionsTest {
+         assertFalse(found);
+     }
+ 
++    @Test
++    void testWildcardMergeWithSubPackageFirst() {
++        // Test case 1: more specific first, then broader
++        final String[] src = {
++            "java.util.concurrent.*",
++            "java.util.*"
++        };
++        final Permissions p = (Permissions) JexlPermissions.parse(src);
++        final Set<String> wildcards = p.getWildcards();
++        // Should only have the broader one since later overrides earlier
++        assertEquals(1, wildcards.size());
++        assertTrue(wildcards.contains("java.util.*"));
++    }
++
++    @Test
++    void testWildcardMergeWithBroaderFirst() {
++        // Test case 2: broader first, then more specific
++        final String[] src = {
++            "java.util.*",
++            "java.util.concurrent.*"
++        };
++        final Permissions p = (Permissions) JexlPermissions.parse(src);
++        final Set<String> wildcards = p.getWildcards();
++        // Should only have the specific one since later overrides earlier
++        assertEquals(1, wildcards.size());
++        assertTrue(wildcards.contains("java.util.concurrent.*"));
++    }
++
++    @Test
++    void testWildcardMergeMultipleLevels() {
++        // Test case 3: multiple levels of wildcards
++        final String[] src = {
++            "java.*",
++            "java.util.*",
++            "java.util.concurrent.*",
++            "java.util.*" // This should be the one left
++        };
++        final Permissions p = (Permissions) JexlPermissions.parse(src);
++        final Set<String> wildcards = p.getWildcards();
++        assertEquals(1, wildcards.size());
++        assertTrue(wildcards.contains("java.util.*"));
++    }
++
+     public static class Scheme {
+         public Pair cons(Object first, Object second) {
+             return new Pair(first, second);

@@ -337,7 +337,7 @@ public class PermissionsParser {
                     i = next;
                     // consume it if it is a wildcard declaration
                     if (pname.endsWith(".*")) {
-                        wildcards.add(pname);
+                        addWildcardWithMerge(pname);
                         pname = null;
                     }
                     continue;
@@ -410,6 +410,34 @@ public class PermissionsParser {
             i += 1;
         }
         return offset;
+    }
+
+    /**
+     * Adds a wildcard to the set, merging existing rules that are included by or include the new rule.
+     * The later rule overrides the earlier one.
+     *
+     * @param wildcard the wildcard rule to add
+     */
+    private void addWildcardWithMerge(String wildcard) {
+        // Extract the base part without the ".*"
+        String baseWildcard = wildcard.substring(0, wildcard.length() - 2);
+
+        // Iterate over a copy to avoid ConcurrentModificationException
+        Set<String> existingWildcards = new java.util.HashSet<>(wildcards);
+
+        for (String existing : existingWildcards) {
+            String baseExisting = existing.substring(0, existing.length() - 2);
+
+            // Check if the new wildcard includes the existing one, or if existing includes the new one
+            // In either case, remove the existing one since later rule overrides earlier
+            if (baseExisting.startsWith(baseWildcard + ".") || baseExisting.equals(baseWildcard) || 
+                baseWildcard.startsWith(baseExisting + ".") || baseWildcard.equals(baseExisting)) {
+                wildcards.remove(existing);
+            }
+        }
+
+        // Always add the new wildcard since it's the later one and overrides earlier ones
+        wildcards.add(wildcard);
     }
 
     /**

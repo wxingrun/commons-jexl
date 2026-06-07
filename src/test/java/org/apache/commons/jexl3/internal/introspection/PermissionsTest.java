@@ -501,6 +501,49 @@ class PermissionsTest {
         assertFalse(found);
     }
 
+    @Test
+    void testWildcardMergeWithSubPackageFirst() {
+        // Test case 1: more specific first, then broader
+        final String[] src = {
+            "java.util.concurrent.*",
+            "java.util.*"
+        };
+        final Permissions p = (Permissions) JexlPermissions.parse(src);
+        final Set<String> wildcards = p.getWildcards();
+        // Should only have the broader one since later overrides earlier
+        assertEquals(1, wildcards.size());
+        assertTrue(wildcards.contains("java.util.*"));
+    }
+
+    @Test
+    void testWildcardMergeWithBroaderFirst() {
+        // Test case 2: broader first, then more specific
+        final String[] src = {
+            "java.util.*",
+            "java.util.concurrent.*"
+        };
+        final Permissions p = (Permissions) JexlPermissions.parse(src);
+        final Set<String> wildcards = p.getWildcards();
+        // Should only have the specific one since later overrides earlier
+        assertEquals(1, wildcards.size());
+        assertTrue(wildcards.contains("java.util.concurrent.*"));
+    }
+
+    @Test
+    void testWildcardMergeMultipleLevels() {
+        // Test case 3: multiple levels of wildcards
+        final String[] src = {
+            "java.*",
+            "java.util.*",
+            "java.util.concurrent.*",
+            "java.util.*" // This should be the one left
+        };
+        final Permissions p = (Permissions) JexlPermissions.parse(src);
+        final Set<String> wildcards = p.getWildcards();
+        assertEquals(1, wildcards.size());
+        assertTrue(wildcards.contains("java.util.*"));
+    }
+
     public static class Scheme {
         public Pair cons(Object first, Object second) {
             return new Pair(first, second);
