@@ -1,0 +1,19 @@
+diff --git a/src/main/java/org/apache/commons/jexl3/MapContext.java b/src/main/java/org/apache/commons/jexl3/MapContext.java
+index a7b85311..e583314e 100644
+--- a/src/main/java/org/apache/commons/jexl3/MapContext.java
++++ b/src/main/java/org/apache/commons/jexl3/MapContext.java
+@@ -68,4 +68,14 @@ public class MapContext implements JexlContext {
+     public void set(final String name, final Object value) {
+         map.put(name, value);
+     }
++
++    /**
++     * Adds all the entries of the specified map to this context.
++     *
++     * @param variables the map containing variable name, value pairs to add
++     * @throws NullPointerException if the map is null
++     */
++    public void putAll(final Map<String, Object> variables) {
++        map.putAll(variables);
++    }
+ }
