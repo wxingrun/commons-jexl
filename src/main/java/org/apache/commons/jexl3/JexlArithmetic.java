@@ -361,6 +361,13 @@ public class JexlArithmetic {
                     final BigDecimal r = toBigDecimal(strictCast, right);
                     return l.add(r, getMathContext());
                 }
+                // if either are BigInteger, use that type
+                if (left instanceof BigInteger || right instanceof BigInteger) {
+                    final BigInteger l = toBigInteger(strictCast, left);
+                    final BigInteger r = toBigInteger(strictCast, right);
+                    final BigInteger result = l.add(r);
+                    return narrowBigInteger(left, right, result);
+                }
                 // if either are floating point (double or float), use double
                 if (isFloatingPointNumber(left) || isFloatingPointNumber(right)) {
                     final double l = toDouble(strictCast, left);
@@ -766,6 +773,16 @@ public class JexlArithmetic {
                 throw new ArithmeticException("/");
             }
             return l.divide(r, getMathContext());
+        }
+        // if either are BigInteger, use that type
+        if (left instanceof BigInteger || right instanceof BigInteger) {
+            final BigInteger l = toBigInteger(strictCast, left);
+            final BigInteger r = toBigInteger(strictCast, right);
+            if (BigInteger.ZERO.equals(r)) {
+                throw new ArithmeticException("/");
+            }
+            final BigInteger result = l.divide(r);
+            return narrowBigInteger(left, right, result);
         }
         // if either are floating point (double or float), use double
         if (isFloatingPointNumber(left) || isFloatingPointNumber(right)) {
@@ -1318,6 +1335,16 @@ public class JexlArithmetic {
             }
             return l.remainder(r, getMathContext());
         }
+        // if either are BigInteger, use that type
+        if (left instanceof BigInteger || right instanceof BigInteger) {
+            final BigInteger l = toBigInteger(strictCast, left);
+            final BigInteger r = toBigInteger(strictCast, right);
+            if (BigInteger.ZERO.equals(r)) {
+                throw new ArithmeticException("%");
+            }
+            final BigInteger result = l.mod(r);
+            return narrowBigInteger(left, right, result);
+        }
         // if either are floating point (double or float), use double
         if (isFloatingPointNumber(left) || isFloatingPointNumber(right)) {
             final double l = toDouble(strictCast, left);
@@ -1367,6 +1394,13 @@ public class JexlArithmetic {
             final BigDecimal l = toBigDecimal(strictCast, left);
             final BigDecimal r = toBigDecimal(strictCast, right);
             return l.multiply(r, getMathContext());
+        }
+        // if either are BigInteger, use that type
+        if (left instanceof BigInteger || right instanceof BigInteger) {
+            final BigInteger l = toBigInteger(strictCast, left);
+            final BigInteger r = toBigInteger(strictCast, right);
+            final BigInteger result = l.multiply(r);
+            return narrowBigInteger(left, right, result);
         }
         // if either are floating point (double or float), use double
         if (isFloatingPointNumber(left) || isFloatingPointNumber(right)) {
@@ -2054,6 +2088,13 @@ public class JexlArithmetic {
             final BigDecimal l = toBigDecimal(strictCast, left);
             final BigDecimal r = toBigDecimal(strictCast, right);
             return l.subtract(r, getMathContext());
+        }
+        // if either are BigInteger, use that type
+        if (left instanceof BigInteger || right instanceof BigInteger) {
+            final BigInteger l = toBigInteger(strictCast, left);
+            final BigInteger r = toBigInteger(strictCast, right);
+            final BigInteger result = l.subtract(r);
+            return narrowBigInteger(left, right, result);
         }
         // if either are floating point (double or float), use double
         if (isFloatingPointNumber(left) || isFloatingPointNumber(right)) {
