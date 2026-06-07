@@ -1,0 +1,24 @@
+diff --git a/.github/workflows/maven.yml b/.github/workflows/maven.yml
+index f2c176b3..6ff0ff45 100644
+--- a/.github/workflows/maven.yml
++++ b/.github/workflows/maven.yml
+@@ -28,17 +28,12 @@ jobs:
+   build:
+ 
+     runs-on: ${{ matrix.os }}
+-    continue-on-error: ${{ matrix.experimental }}
++    continue-on-error: ${{ matrix.java == '26-ea' }}
+     strategy:
+       max-parallel: 20
+       matrix:
+         os: [ubuntu-latest, windows-latest]
+-        java: [ 8, 11, 17, 21, 25 ]
+-        experimental: [false]
+-        include:
+-          - java: 26-ea
+-            os: windows-latest
+-            experimental: true
++        java: [ 8, 11, 17, 21, 25, '26-ea' ]
+       fail-fast: false
+ 
+     steps:
