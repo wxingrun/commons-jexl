@@ -501,6 +501,32 @@ class PermissionsTest {
         assertFalse(found);
     }
 
+    @Test
+    void testComposeKeepsLaterSpecificDenyWithinWildcard() {
+        final Permissions p = (Permissions) JexlPermissions.parse("java.util.*").compose("java.util { Map {} }");
+        final Permissions.NoJexlPackage njpackage = p.getPackages().get("java.util");
+        assertNotNull(njpackage);
+        assertTrue(njpackage instanceof Permissions.JexlPackage);
+        assertFalse(p.allow(getMethod(Map.class, "size")));
+        assertTrue(p.allow(getMethod(Set.class, "isEmpty")));
+    }
+
+    @Test
+    void testComposeMergesLaterWildcardWithEarlierContainedRule() {
+        final Permissions p = (Permissions) JexlPermissions.parse("java.util { +Map {} }").compose("java.util.*");
+        assertFalse(p.getPackages().containsKey("java.util"));
+        assertTrue(p.allow(getMethod(Map.class, "size")));
+        assertTrue(p.allow(getMethod(Set.class, "isEmpty")));
+    }
+
+    @Test
+    void testComposeMergesRedundantAllowedClassWithinWildcard() {
+        final Permissions p = (Permissions) JexlPermissions.parse("java.util.*").compose("java.util { +Map {} }");
+        assertFalse(p.getPackages().containsKey("java.util"));
+        assertTrue(p.allow(getMethod(Map.class, "size")));
+        assertTrue(p.allow(getMethod(Set.class, "isEmpty")));
+    }
+
     public static class Scheme {
         public Pair cons(Object first, Object second) {
             return new Pair(first, second);

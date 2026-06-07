@@ -1,0 +1,227 @@
+diff --git a/src/main/java/org/apache/commons/jexl3/internal/introspection/Permissions.java b/src/main/java/org/apache/commons/jexl3/internal/introspection/Permissions.java
+index b5d15988..908929bd 100644
+--- a/src/main/java/org/apache/commons/jexl3/internal/introspection/Permissions.java
++++ b/src/main/java/org/apache/commons/jexl3/internal/introspection/Permissions.java
+@@ -24,7 +24,7 @@ import java.lang.reflect.Modifier;
+ import java.lang.reflect.Proxy;
+ import java.util.Collections;
+ import java.util.HashMap;
+-import java.util.HashSet;
++import java.util.LinkedHashSet;
+ import java.util.Map;
+ import java.util.Objects;
+ import java.util.Set;
+@@ -278,7 +278,7 @@ public class Permissions implements JexlPermissions {
+      */
+     @Override
+     public Permissions compose(final String... src) {
+-        return new PermissionsParser().parse(new HashSet<>(allowed), copyMap(packages), src);
++        return new PermissionsParser().parse(new LinkedHashSet<>(allowed), copyMap(packages), src);
+     }
+ 
+     /**
+diff --git a/src/main/java/org/apache/commons/jexl3/internal/introspection/PermissionsParser.java b/src/main/java/org/apache/commons/jexl3/internal/introspection/PermissionsParser.java
+index a5631002..2e2a00bd 100644
+--- a/src/main/java/org/apache/commons/jexl3/internal/introspection/PermissionsParser.java
++++ b/src/main/java/org/apache/commons/jexl3/internal/introspection/PermissionsParser.java
+@@ -119,6 +119,60 @@ public class PermissionsParser {
+         return parse(new LinkedHashSet<>(), new ConcurrentHashMap<>(), srcs);
+     }
+ 
++    private void addWildcard(final String wildcard) {
++        final String packageName = wildcardPackage(wildcard);
++        final boolean covered = hasWildcardAncestor(packageName);
++        final Set<String> redundantWildcards = new LinkedHashSet<>();
++        for (final String current : wildcards) {
++            if (containsPackage(packageName, wildcardPackage(current))) {
++                redundantWildcards.add(current);
++            }
++        }
++        wildcards.removeAll(redundantWildcards);
++        final Set<String> redundantPackages = new LinkedHashSet<>();
++        for (final String current : packages.keySet()) {
++            if (containsPackage(packageName, current)) {
++                redundantPackages.add(current);
++            }
++        }
++        for (final String current : redundantPackages) {
++            packages.remove(current);
++        }
++        if (!covered) {
++            wildcards.add(wildcard);
++        }
++    }
++
++    private boolean containsPackage(final String container, final String candidate) {
++        return candidate.equals(container) || candidate.startsWith(container + ".");
++    }
++
++    private boolean hasWildcardAncestor(final String packageName) {
++        int dot = packageName.lastIndexOf('.');
++        while (dot > 0) {
++            final String parent = packageName.substring(0, dot);
++            if (wildcards.contains(parent + ".*")) {
++                return true;
++            }
++            dot = parent.lastIndexOf('.');
++        }
++        return false;
++    }
++
++    private boolean isRedundantClass(final String packageName, final Permissions.NoJexlPackage njpackage,
++            final Permissions.NoJexlClass njclass) {
++        return njclass == Permissions.JEXL_CLASS
++            && (njpackage instanceof Permissions.JexlPackage || wildcardAllow(packageName));
++    }
++
++    private boolean wildcardAllow(final String packageName) {
++        return Permissions.wildcardAllow(wildcards, packageName);
++    }
++
++    private String wildcardPackage(final String wildcard) {
++        return wildcard.substring(0, wildcard.length() - 2);
++    }
++
+     /**
+      * Reads a class permission.
+      *
+@@ -129,7 +183,8 @@ public class PermissionsParser {
+      * @param offset the initial parsing position in the source
+      * @return the new parsing position
+      */
+-    private int readClass(final Permissions.NoJexlPackage njpackage, final boolean nojexl, final String outer, final String inner, final int offset) {
++    private int readClass(final String packageName, final Permissions.NoJexlPackage njpackage,
++            final boolean nojexl, final String outer, final String inner, final int offset) {
+         final StringBuilder temp = new StringBuilder();
+         Permissions.NoJexlClass njclass = null;
+         String njname = null;
+@@ -186,13 +241,12 @@ public class PermissionsParser {
+                 // if we have a class, it has a name
+                 njclass = deny ? new Permissions.NoJexlClass() : new Permissions.JexlClass();
+                 njname = outer != null ? outer + "$" + identifier : identifier;
+-                njpackage.addNoJexl(njname, njclass);
+                 identifier = null;
+             } else if (identifier != null)  {
+                 // class member mode
+                 if (c == '{') {
+                     // inner class
+-                    i = readClass(njpackage, deny, njname, identifier, i - 1);
++                    i = readClass(packageName, njpackage, deny, njname, identifier, i - 1);
+                     identifier = null;
+                     continue;
+                 }
+@@ -217,14 +271,12 @@ public class PermissionsParser {
+         }
+         // empty class means allow or deny all
+         if (njname != null) {
+-            if (njclass.isEmpty()) {
+-                njpackage.addNoJexl(njname,
+-                    njclass instanceof Permissions.JexlClass
+-                        ? Permissions.JEXL_CLASS
+-                        : Permissions.NOJEXL_CLASS);
+-            } else {
+-                njpackage.addNoJexl(njname, njclass);
+-            }
++            final Permissions.NoJexlClass rule = njclass.isEmpty()
++                ? njclass instanceof Permissions.JexlClass
++                    ? Permissions.JEXL_CLASS
++                    : Permissions.NOJEXL_CLASS
++                : njclass;
++            njpackage.addNoJexl(njname, isRedundantClass(packageName, njpackage, rule) ? null : rule);
+         }
+         return i;
+     }
+@@ -337,7 +389,7 @@ public class PermissionsParser {
+                     i = next;
+                     // consume it if it is a wildcard declaration
+                     if (pname.endsWith(".*")) {
+-                        wildcards.add(pname);
++                        addWildcard(pname);
+                         pname = null;
+                     }
+                     continue;
+@@ -361,12 +413,15 @@ public class PermissionsParser {
+                     //negative = true;
+                 }
+                 if (c == '{') {
+-                    Boolean specified = negative;
+-                    njpackage = packages.compute(pname,
++                    final Boolean specified = negative;
++                    final String packageName = pname;
++                    njpackage = packages.compute(packageName,
+                         (n, p) -> {
+                             // if we haven't specified allow/deny,
+-                            // keep the existing specification if any, otherwise default to deny
+-                            boolean deny = specified == null ? !(p instanceof Permissions.JexlPackage) : specified;
++                            // keep the existing specification if any, otherwise inherit from any broader wildcard
++                            boolean deny = specified == null
++                                ? !(p instanceof Permissions.JexlPackage) && !wildcardAllow(packageName)
++                                : specified;
+                             Map<String, Permissions.NoJexlClass> pkgMap = p == null ? null : p.nojexl;
+                             return deny
+                                 ? new Permissions.NoJexlPackage(pkgMap)
+@@ -378,9 +433,15 @@ public class PermissionsParser {
+             } else if (c == '}') {
+                 // empty means the whole package
+                 if (njpackage.isEmpty()) {
+-                    packages.put(pname, negative == null || negative
+-                        ? Permissions.NOJEXL_PACKAGE
+-                        : Permissions.JEXL_PACKAGE);
++                    if (njpackage instanceof Permissions.JexlPackage) {
++                        if (wildcardAllow(pname)) {
++                            packages.remove(pname);
++                        } else {
++                            packages.put(pname, Permissions.JEXL_PACKAGE);
++                        }
++                    } else {
++                        packages.put(pname, Permissions.NOJEXL_PACKAGE);
++                    }
+                 } else {
+                     packages.put(pname, njpackage);
+                 }
+@@ -389,7 +450,7 @@ public class PermissionsParser {
+                 negative = null;
+                 i += 1;
+             } else {
+-                i = readClass(njpackage, true,null, null, i);
++                i = readClass(pname, njpackage, true, null, null, i);
+             }
+         }
+     }
+diff --git a/src/test/java/org/apache/commons/jexl3/internal/introspection/PermissionsTest.java b/src/test/java/org/apache/commons/jexl3/internal/introspection/PermissionsTest.java
+index 4897deb8..c00f2620 100644
+--- a/src/test/java/org/apache/commons/jexl3/internal/introspection/PermissionsTest.java
++++ b/src/test/java/org/apache/commons/jexl3/internal/introspection/PermissionsTest.java
+@@ -501,6 +501,32 @@ class PermissionsTest {
+         assertFalse(found);
+     }
+ 
++    @Test
++    void testComposeKeepsLaterSpecificDenyWithinWildcard() {
++        final Permissions p = (Permissions) JexlPermissions.parse("java.util.*").compose("java.util { Map {} }");
++        final Permissions.NoJexlPackage njpackage = p.getPackages().get("java.util");
++        assertNotNull(njpackage);
++        assertTrue(njpackage instanceof Permissions.JexlPackage);
++        assertFalse(p.allow(getMethod(Map.class, "size")));
++        assertTrue(p.allow(getMethod(Set.class, "isEmpty")));
++    }
++
++    @Test
++    void testComposeMergesLaterWildcardWithEarlierContainedRule() {
++        final Permissions p = (Permissions) JexlPermissions.parse("java.util { +Map {} }").compose("java.util.*");
++        assertFalse(p.getPackages().containsKey("java.util"));
++        assertTrue(p.allow(getMethod(Map.class, "size")));
++        assertTrue(p.allow(getMethod(Set.class, "isEmpty")));
++    }
++
++    @Test
++    void testComposeMergesRedundantAllowedClassWithinWildcard() {
++        final Permissions p = (Permissions) JexlPermissions.parse("java.util.*").compose("java.util { +Map {} }");
++        assertFalse(p.getPackages().containsKey("java.util"));
++        assertTrue(p.allow(getMethod(Map.class, "size")));
++        assertTrue(p.allow(getMethod(Set.class, "isEmpty")));
++    }
++
+     public static class Scheme {
+         public Pair cons(Object first, Object second) {
+             return new Pair(first, second);

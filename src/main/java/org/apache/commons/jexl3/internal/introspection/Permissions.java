@@ -24,7 +24,7 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -278,7 +278,7 @@ public class Permissions implements JexlPermissions {
      */
     @Override
     public Permissions compose(final String... src) {
-        return new PermissionsParser().parse(new HashSet<>(allowed), copyMap(packages), src);
+        return new PermissionsParser().parse(new LinkedHashSet<>(allowed), copyMap(packages), src);
     }
 
     /**
