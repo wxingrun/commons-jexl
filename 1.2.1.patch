@@ -1,0 +1,73 @@
+diff --git a/src/main/java/org/apache/commons/jexl3/JexlArithmetic.java b/src/main/java/org/apache/commons/jexl3/JexlArithmetic.java
+index 140bf495..662721d4 100644
+--- a/src/main/java/org/apache/commons/jexl3/JexlArithmetic.java
++++ b/src/main/java/org/apache/commons/jexl3/JexlArithmetic.java
+@@ -1473,6 +1473,9 @@ public class JexlArithmetic {
+      * @return an Integer or Long if narrowing is possible, the original BigInteger otherwise
+      */
+     protected Number narrowBigInteger(final Object lhs, final Object rhs, final BigInteger big) {
++        if (lhs instanceof BigInteger || rhs instanceof BigInteger) {
++            return big;
++        }
+         return narrowToLong(lhs, rhs, big, BigInteger::longValueExact);
+     }
+ 
+diff --git a/src/test/java/org/apache/commons/jexl3/ArithmeticTest.java b/src/test/java/org/apache/commons/jexl3/ArithmeticTest.java
+index 21b903cc..62d097a1 100644
+--- a/src/test/java/org/apache/commons/jexl3/ArithmeticTest.java
++++ b/src/test/java/org/apache/commons/jexl3/ArithmeticTest.java
+@@ -539,6 +539,12 @@ class ArithmeticTest extends JexlTestCase {
+         jexlb = jexla.options(options);
+     }
+ 
++    private Object runStrictArithmeticScript(final String source, final String[] parameters, final Object... arguments) {
++        final JexlEvalContext ctxt = new JexlEvalContext();
++        ctxt.getEngineOptions().setStrictArithmetic(true);
++        return JEXL.createScript(source, parameters).execute(ctxt, arguments);
++    }
++
+     void checkEmpty(final Object x, final boolean expect) {
+         final JexlScript s0 = JEXL.createScript("empty(x)", "x");
+         boolean empty = (Boolean) s0.execute(null, x);
+@@ -1045,6 +1051,41 @@ class ArithmeticTest extends JexlTestCase {
+         assertEquals("9223372036854775806.5", res);
+     }
+ 
++    @Test
++    void testBigIntegerLongAdd() {
++        final Object result = runStrictArithmeticScript("x + 1L", new String[] {"x"}, new BigInteger("9223372036854775808"));
++        assertEquals(new BigInteger("9223372036854775809"), result);
++        assertTrue(result instanceof BigInteger);
++    }
++
++    @Test
++    void testBigIntegerLongDivide() {
++        final Object result = runStrictArithmeticScript("x / 2L", new String[] {"x"}, new BigInteger("10"));
++        assertEquals(new BigInteger("5"), result);
++        assertTrue(result instanceof BigInteger);
++    }
++
++    @Test
++    void testBigIntegerLongMod() {
++        final Object result = runStrictArithmeticScript("x % 3L", new String[] {"x"}, new BigInteger("10"));
++        assertEquals(BigInteger.ONE, result);
++        assertTrue(result instanceof BigInteger);
++    }
++
++    @Test
++    void testBigIntegerLongMultiply() {
++        final Object result = runStrictArithmeticScript("x * 2L", new String[] {"x"}, new BigInteger("4611686018427387904"));
++        assertEquals(new BigInteger("9223372036854775808"), result);
++        assertTrue(result instanceof BigInteger);
++    }
++
++    @Test
++    void testLongBigIntegerSubtract() {
++        final Object result = runStrictArithmeticScript("1L - x", new String[] {"x"}, new BigInteger("9223372036854775808"));
++        assertEquals(new BigInteger("-9223372036854775807"), result);
++        assertTrue(result instanceof BigInteger);
++    }
++
+     /**
+    * test some simple mathematical calculations
+    */

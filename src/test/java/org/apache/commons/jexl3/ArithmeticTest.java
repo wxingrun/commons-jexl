@@ -539,6 +539,12 @@ class ArithmeticTest extends JexlTestCase {
         jexlb = jexla.options(options);
     }
 
+    private Object runStrictArithmeticScript(final String source, final String[] parameters, final Object... arguments) {
+        final JexlEvalContext ctxt = new JexlEvalContext();
+        ctxt.getEngineOptions().setStrictArithmetic(true);
+        return JEXL.createScript(source, parameters).execute(ctxt, arguments);
+    }
+
     void checkEmpty(final Object x, final boolean expect) {
         final JexlScript s0 = JEXL.createScript("empty(x)", "x");
         boolean empty = (Boolean) s0.execute(null, x);
@@ -1043,6 +1049,41 @@ class ArithmeticTest extends JexlTestCase {
         final JexlExpression e = JEXL.createExpression("9223372036854775806.5B");
         final String res = String.valueOf(e.evaluate(ctxt));
         assertEquals("9223372036854775806.5", res);
+    }
+
+    @Test
+    void testBigIntegerLongAdd() {
+        final Object result = runStrictArithmeticScript("x + 1L", new String[] {"x"}, new BigInteger("9223372036854775808"));
+        assertEquals(new BigInteger("9223372036854775809"), result);
+        assertTrue(result instanceof BigInteger);
+    }
+
+    @Test
+    void testBigIntegerLongDivide() {
+        final Object result = runStrictArithmeticScript("x / 2L", new String[] {"x"}, new BigInteger("10"));
+        assertEquals(new BigInteger("5"), result);
+        assertTrue(result instanceof BigInteger);
+    }
+
+    @Test
+    void testBigIntegerLongMod() {
+        final Object result = runStrictArithmeticScript("x % 3L", new String[] {"x"}, new BigInteger("10"));
+        assertEquals(BigInteger.ONE, result);
+        assertTrue(result instanceof BigInteger);
+    }
+
+    @Test
+    void testBigIntegerLongMultiply() {
+        final Object result = runStrictArithmeticScript("x * 2L", new String[] {"x"}, new BigInteger("4611686018427387904"));
+        assertEquals(new BigInteger("9223372036854775808"), result);
+        assertTrue(result instanceof BigInteger);
+    }
+
+    @Test
+    void testLongBigIntegerSubtract() {
+        final Object result = runStrictArithmeticScript("1L - x", new String[] {"x"}, new BigInteger("9223372036854775808"));
+        assertEquals(new BigInteger("-9223372036854775807"), result);
+        assertTrue(result instanceof BigInteger);
     }
 
     /**

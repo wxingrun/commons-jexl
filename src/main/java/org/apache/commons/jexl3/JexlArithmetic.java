@@ -1473,6 +1473,9 @@ public class JexlArithmetic {
      * @return an Integer or Long if narrowing is possible, the original BigInteger otherwise
      */
     protected Number narrowBigInteger(final Object lhs, final Object rhs, final BigInteger big) {
+        if (lhs instanceof BigInteger || rhs instanceof BigInteger) {
+            return big;
+        }
         return narrowToLong(lhs, rhs, big, BigInteger::longValueExact);
     }
 
