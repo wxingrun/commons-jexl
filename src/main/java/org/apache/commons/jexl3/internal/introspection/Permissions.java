@@ -278,7 +278,42 @@ public class Permissions implements JexlPermissions {
      */
     @Override
     public Permissions compose(final String... src) {
-        return new PermissionsParser().parse(new HashSet<>(allowed), copyMap(packages), src);
+        Set<String> nallowed = new HashSet<>(allowed);
+        Map<String, NoJexlPackage> npackages = copyMap(packages);
+        for (String s : src) {
+            Permissions parsed = new PermissionsParser().parse(s);
+            Set<String> newWildcards = parsed.getWildcards();
+            Set<String> newPackageNames = parsed.getPackages().keySet();
+            new PermissionsParser().parse(nallowed, npackages, s);
+            for (String w : newWildcards) {
+                String prefix = w.substring(0, w.length() - 2);
+                npackages.keySet().removeIf(pkg -> pkg.equals(prefix) || pkg.startsWith(prefix + "."));
+            }
+            for (String pkg : newPackageNames) {
+                NoJexlPackage njp = npackages.get(pkg);
+                if (njp instanceof JexlPackage) {
+                    boolean covered = false;
+                    for (String w : nallowed) {
+                        if (wildcardCovers(w, pkg)) {
+                            covered = true;
+                            break;
+                        }
+                    }
+                    if (covered) {
+                        npackages.remove(pkg);
+                    }
+                }
+            }
+        }
+        return new Permissions(nallowed, npackages);
+    }
+
+    private static boolean wildcardCovers(String wildcard, String pkg) {
+        if (!wildcard.endsWith(".*")) {
+            return false;
+        }
+        String prefix = wildcard.substring(0, wildcard.length() - 2);
+        return pkg.equals(prefix) || pkg.startsWith(prefix + ".");
     }
 
     /**

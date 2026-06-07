@@ -592,4 +592,64 @@ class PermissionsTest {
             }
         }
     }
+
+    @Test
+    void testComposeMergeWildcardAndPositiveRestriction() throws Exception {
+        final JexlPermissions permissions = RESTRICTED.compose(
+            "java.util.*",
+            "java.util { +Map {} }"
+        );
+        assertTrue(permissions.allow(Map.class.getMethod("get", Object.class)),
+            "Map.get should be allowed via wildcard java.util.*");
+        assertTrue(permissions.allow(java.util.List.class.getMethod("get", int.class)),
+            "List.get should be allowed via wildcard java.util.*");
+    }
+
+    @Test
+    void testComposeWildcardThenNegativeRestriction() throws Exception {
+        final JexlPermissions permissions = RESTRICTED.compose(
+            "java.util.*",
+            "java.util { Map {} }"
+        );
+        assertFalse(permissions.allow(Map.class.getMethod("get", Object.class)),
+            "Map.get should be denied by negative restriction");
+        assertTrue(permissions.allow(java.util.List.class.getMethod("get", int.class)),
+            "List.get should be allowed via wildcard java.util.*");
+    }
+
+    @Test
+    void testComposeNegativeRestrictionThenWildcard() throws Exception {
+        final JexlPermissions permissions = RESTRICTED.compose(
+            "java.util { Map {} }",
+            "java.util.*"
+        );
+        assertTrue(permissions.allow(Map.class.getMethod("get", Object.class)),
+            "Map.get should be allowed via later wildcard java.util.*");
+        assertTrue(permissions.allow(java.util.List.class.getMethod("get", int.class)),
+            "List.get should be allowed via wildcard java.util.*");
+    }
+
+    @Test
+    void testComposePositiveRestrictionThenWildcard() throws Exception {
+        final JexlPermissions permissions = RESTRICTED.compose(
+            "java.util { +Map {} }",
+            "java.util.*"
+        );
+        assertTrue(permissions.allow(Map.class.getMethod("get", Object.class)),
+            "Map.get should be allowed via later wildcard java.util.*");
+        assertTrue(permissions.allow(java.util.List.class.getMethod("get", int.class)),
+            "List.get should be allowed via wildcard java.util.*");
+    }
+
+    @Test
+    void testComposeMultipleWildcardsNoInteraction() throws Exception {
+        final JexlPermissions permissions = RESTRICTED.compose(
+            "java.util.*",
+            "java.io.*"
+        );
+        assertTrue(permissions.allow(Map.class.getMethod("get", Object.class)),
+            "Map.get should be allowed via java.util.*");
+        assertTrue(permissions.allow(java.io.File.class.getMethod("getName")),
+            "File.getName should be allowed via java.io.*");
+    }
 }
