@@ -447,7 +447,7 @@ public class JexlScriptEngine extends AbstractScriptEngine implements Compilable
         // This is mandated by JSR-223 (see SCR.5.5.2   Methods)
         Objects.requireNonNull(reader, "reader");
         Objects.requireNonNull(context, CONTEXT_KEY);
-        return eval(readerToString(reader), context);
+        return evalImpl(readerToString(reader), context);
     }
 
     @Override
@@ -455,6 +455,18 @@ public class JexlScriptEngine extends AbstractScriptEngine implements Compilable
         // This is mandated by JSR-223 (see SCR.5.5.2   Methods)
         Objects.requireNonNull(script, "script");
         Objects.requireNonNull(context, CONTEXT_KEY);
+        return evalImpl(script, context);
+    }
+
+    /**
+     * Extracts common logic for script execution.
+     *
+     * @param script the script to execute
+     * @param context the script context
+     * @return the result of the script execution
+     * @throws ScriptException if an error occurs
+     */
+    private Object evalImpl(final String script, final ScriptContext context) throws ScriptException {
         // This is mandated by JSR-223 (end of section SCR.4.3.4.1.2 - JexlScript Execution)
         context.setAttribute(CONTEXT_KEY, context, ScriptContext.ENGINE_SCOPE);
         try {
