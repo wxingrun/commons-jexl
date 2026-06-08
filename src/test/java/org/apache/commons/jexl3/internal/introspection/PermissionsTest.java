@@ -592,4 +592,82 @@ class PermissionsTest {
             }
         }
     }
+
+    @Test
+    void testComposeMergeWildcardSubsumesClassAllow() {
+        final Permissions p = (Permissions) JexlPermissions.parse(
+            "java.util.*",
+            "java.util { +Map {} }"
+        );
+        final Map<String, Permissions.NoJexlPackage> pkgMap = p.getPackages();
+        assertFalse(pkgMap.containsKey("java.util"),
+            "java.util package entry should be removed when wildcard java.util.* subsumes +Map {}");
+        assertTrue(p.getWildcards().contains("java.util.*"));
+        assertTrue(p.allow(java.util.Map.class));
+        assertTrue(p.allow(java.util.ArrayList.class));
+        assertTrue(p.allow(java.util.HashMap.class));
+    }
+
+    @Test
+    void testComposeMergeWildcardPreservesClassDeny() {
+        final Permissions p = (Permissions) JexlPermissions.parse(
+            "java.util.*",
+            "java.util { Map {} }"
+        );
+        final Map<String, Permissions.NoJexlPackage> pkgMap = p.getPackages();
+        assertTrue(pkgMap.containsKey("java.util"),
+            "java.util package entry should be preserved when it contains deny entries");
+        final Permissions.NoJexlPackage pkg = pkgMap.get("java.util");
+        assertTrue(pkg instanceof Permissions.JexlPackage,
+            "NoJexlPackage should be converted to JexlPackage when wildcard allows the package");
+        assertTrue(p.getWildcards().contains("java.util.*"));
+        assertFalse(p.allow(java.util.Map.class),
+            "Map should be denied as an explicit exception to the wildcard");
+        assertTrue(p.allow(java.util.ArrayList.class),
+            "ArrayList should be allowed by the wildcard");
+    }
+
+    @Test
+    void testComposeMergeChainedCompose() {
+        final JexlPermissions p0 = JexlPermissions.parse("java.util { +Map {} }");
+        final Permissions p = (Permissions) p0.compose("java.util.*");
+        final Map<String, Permissions.NoJexlPackage> pkgMap = p.getPackages();
+        assertFalse(pkgMap.containsKey("java.util"),
+            "After composing wildcard, redundant class allow entry should be merged away");
+        assertTrue(p.allow(java.util.Map.class));
+        assertTrue(p.allow(java.util.ArrayList.class));
+    }
+
+    @Test
+    void testComposeMergeWildcardWithMixedEntries() {
+        final Permissions p = (Permissions) JexlPermissions.parse(
+            "java.util.*",
+            "java.util { +Map {} ArrayList {} }"
+        );
+        final Map<String, Permissions.NoJexlPackage> pkgMap = p.getPackages();
+        assertTrue(pkgMap.containsKey("java.util"),
+            "Package entry should be preserved when it contains deny entries (ArrayList)");
+        final Permissions.NoJexlPackage pkg = pkgMap.get("java.util");
+        assertTrue(pkg instanceof Permissions.JexlPackage,
+            "NoJexlPackage should be converted to JexlPackage when wildcard allows the package");
+        assertTrue(p.allow(java.util.Map.class),
+            "Map should be allowed (redundant +Map {} removed, covered by wildcard)");
+        assertFalse(p.allow(java.util.ArrayList.class),
+            "ArrayList should be denied as an explicit exception");
+        assertTrue(p.allow(java.util.HashSet.class),
+            "HashSet should be allowed by the wildcard");
+    }
+
+    @Test
+    void testComposeMergeNoWildcardNoMerge() {
+        final Permissions p = (Permissions) JexlPermissions.parse(
+            "java.util { +Map {} }"
+        );
+        final Map<String, Permissions.NoJexlPackage> pkgMap = p.getPackages();
+        assertTrue(pkgMap.containsKey("java.util"),
+            "Without wildcard, package entry should not be merged away");
+        assertTrue(p.allow(java.util.Map.class));
+        assertTrue(p.allow(java.util.ArrayList.class),
+            "With empty wildcard set (allow-all default), ArrayList should be allowed");
+    }
 }

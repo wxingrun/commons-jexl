@@ -1,0 +1,161 @@
+diff --git a/src/main/java/org/apache/commons/jexl3/internal/introspection/Permissions.java b/src/main/java/org/apache/commons/jexl3/internal/introspection/Permissions.java
+index b5d15988..3fecc148 100644
+--- a/src/main/java/org/apache/commons/jexl3/internal/introspection/Permissions.java
++++ b/src/main/java/org/apache/commons/jexl3/internal/introspection/Permissions.java
+@@ -272,13 +272,68 @@ public class Permissions implements JexlPermissions {
+ 
+     /**
+      * Creates a new set of permissions by composing these permissions with a new set of rules.
++     * <p>After composing, this method merges redundant permission rules: when a wildcard
++     * allows a package, class-level allow entries in that package that are subsumed by the
++     * wildcard are removed, and NoJexlPackage entries are converted to JexlPackage entries
++     * (since the wildcard makes the default behavior allow). Deny entries are preserved as
++     * explicit exceptions to the wildcard.</p>
+      *
+      * @param src the rules
+      * @return the new permissions
+      */
+     @Override
+     public Permissions compose(final String... src) {
+-        return new PermissionsParser().parse(new HashSet<>(allowed), copyMap(packages), src);
++        final Permissions composed = new PermissionsParser().parse(new HashSet<>(allowed), copyMap(packages), src);
++        return merge(composed);
++    }
++
++    /**
++     * Merges redundant permission rules after composition.
++     * <p>When a wildcard allows a package:</p>
++     * <ul>
++     * <li>Class-level allow entries (JEXL_CLASS) that are subsumed by the wildcard are removed.</li>
++     * <li>NoJexlPackage entries are converted to JexlPackage entries since the wildcard
++     * makes the default behavior allow; deny entries (NOJEXL_CLASS) are preserved as exceptions.</li>
++     * <li>Empty JexlPackage entries are removed since they are fully redundant with the wildcard.</li>
++     * </ul>
++     *
++     * @param permissions the permissions to merge
++     * @return the merged permissions, or the same instance if no merge was needed
++     */
++    private Permissions merge(final Permissions permissions) {
++        final Set<String> wildcards = permissions.getWildcards();
++        if (wildcards.isEmpty()) {
++            return permissions;
++        }
++        final Map<String, NoJexlPackage> pkgMap = permissions.getPackages();
++        if (pkgMap.isEmpty()) {
++            return permissions;
++        }
++        boolean changed = false;
++        final Map<String, NoJexlPackage> merged = new HashMap<>(pkgMap);
++        for (final Map.Entry<String, NoJexlPackage> entry : pkgMap.entrySet()) {
++            final String packageName = entry.getKey();
++            if (!wildcardAllow(wildcards, packageName)) {
++                continue;
++            }
++            final NoJexlPackage pkg = entry.getValue();
++            final Map<String, NoJexlClass> classMap = new HashMap<>(pkg.nojexl);
++            for (final Map.Entry<String, NoJexlClass> classEntry : classMap.entrySet()) {
++                final NoJexlClass njc = classEntry.getValue();
++                if (njc == JEXL_CLASS) {
++                    pkg.addNoJexl(classEntry.getKey(), null);
++                    changed = true;
++                }
++            }
++            if (pkg.isEmpty()) {
++                merged.remove(packageName);
++                changed = true;
++            } else if (!(pkg instanceof JexlPackage)) {
++                merged.put(packageName, new JexlPackage(pkg.nojexl));
++                changed = true;
++            }
++        }
++        return changed ? new Permissions(new HashSet<>(wildcards), merged) : permissions;
+     }
+ 
+     /**
+diff --git a/src/test/java/org/apache/commons/jexl3/internal/introspection/PermissionsTest.java b/src/test/java/org/apache/commons/jexl3/internal/introspection/PermissionsTest.java
+index 4897deb8..e70c28c9 100644
+--- a/src/test/java/org/apache/commons/jexl3/internal/introspection/PermissionsTest.java
++++ b/src/test/java/org/apache/commons/jexl3/internal/introspection/PermissionsTest.java
+@@ -592,4 +592,82 @@ class PermissionsTest {
+             }
+         }
+     }
++
++    @Test
++    void testComposeMergeWildcardSubsumesClassAllow() {
++        final Permissions p = (Permissions) JexlPermissions.parse(
++            "java.util.*",
++            "java.util { +Map {} }"
++        );
++        final Map<String, Permissions.NoJexlPackage> pkgMap = p.getPackages();
++        assertFalse(pkgMap.containsKey("java.util"),
++            "java.util package entry should be removed when wildcard java.util.* subsumes +Map {}");
++        assertTrue(p.getWildcards().contains("java.util.*"));
++        assertTrue(p.allow(java.util.Map.class));
++        assertTrue(p.allow(java.util.ArrayList.class));
++        assertTrue(p.allow(java.util.HashMap.class));
++    }
++
++    @Test
++    void testComposeMergeWildcardPreservesClassDeny() {
++        final Permissions p = (Permissions) JexlPermissions.parse(
++            "java.util.*",
++            "java.util { Map {} }"
++        );
++        final Map<String, Permissions.NoJexlPackage> pkgMap = p.getPackages();
++        assertTrue(pkgMap.containsKey("java.util"),
++            "java.util package entry should be preserved when it contains deny entries");
++        final Permissions.NoJexlPackage pkg = pkgMap.get("java.util");
++        assertTrue(pkg instanceof Permissions.JexlPackage,
++            "NoJexlPackage should be converted to JexlPackage when wildcard allows the package");
++        assertTrue(p.getWildcards().contains("java.util.*"));
++        assertFalse(p.allow(java.util.Map.class),
++            "Map should be denied as an explicit exception to the wildcard");
++        assertTrue(p.allow(java.util.ArrayList.class),
++            "ArrayList should be allowed by the wildcard");
++    }
++
++    @Test
++    void testComposeMergeChainedCompose() {
++        final JexlPermissions p0 = JexlPermissions.parse("java.util { +Map {} }");
++        final Permissions p = (Permissions) p0.compose("java.util.*");
++        final Map<String, Permissions.NoJexlPackage> pkgMap = p.getPackages();
++        assertFalse(pkgMap.containsKey("java.util"),
++            "After composing wildcard, redundant class allow entry should be merged away");
++        assertTrue(p.allow(java.util.Map.class));
++        assertTrue(p.allow(java.util.ArrayList.class));
++    }
++
++    @Test
++    void testComposeMergeWildcardWithMixedEntries() {
++        final Permissions p = (Permissions) JexlPermissions.parse(
++            "java.util.*",
++            "java.util { +Map {} ArrayList {} }"
++        );
++        final Map<String, Permissions.NoJexlPackage> pkgMap = p.getPackages();
++        assertTrue(pkgMap.containsKey("java.util"),
++            "Package entry should be preserved when it contains deny entries (ArrayList)");
++        final Permissions.NoJexlPackage pkg = pkgMap.get("java.util");
++        assertTrue(pkg instanceof Permissions.JexlPackage,
++            "NoJexlPackage should be converted to JexlPackage when wildcard allows the package");
++        assertTrue(p.allow(java.util.Map.class),
++            "Map should be allowed (redundant +Map {} removed, covered by wildcard)");
++        assertFalse(p.allow(java.util.ArrayList.class),
++            "ArrayList should be denied as an explicit exception");
++        assertTrue(p.allow(java.util.HashSet.class),
++            "HashSet should be allowed by the wildcard");
++    }
++
++    @Test
++    void testComposeMergeNoWildcardNoMerge() {
++        final Permissions p = (Permissions) JexlPermissions.parse(
++            "java.util { +Map {} }"
++        );
++        final Map<String, Permissions.NoJexlPackage> pkgMap = p.getPackages();
++        assertTrue(pkgMap.containsKey("java.util"),
++            "Without wildcard, package entry should not be merged away");
++        assertTrue(p.allow(java.util.Map.class));
++        assertTrue(p.allow(java.util.ArrayList.class),
++            "With empty wildcard set (allow-all default), ArrayList should be allowed");
++    }
+ }

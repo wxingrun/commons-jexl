@@ -272,13 +272,68 @@ public class Permissions implements JexlPermissions {
 
     /**
      * Creates a new set of permissions by composing these permissions with a new set of rules.
+     * <p>After composing, this method merges redundant permission rules: when a wildcard
+     * allows a package, class-level allow entries in that package that are subsumed by the
+     * wildcard are removed, and NoJexlPackage entries are converted to JexlPackage entries
+     * (since the wildcard makes the default behavior allow). Deny entries are preserved as
+     * explicit exceptions to the wildcard.</p>
      *
      * @param src the rules
      * @return the new permissions
      */
     @Override
     public Permissions compose(final String... src) {
-        return new PermissionsParser().parse(new HashSet<>(allowed), copyMap(packages), src);
+        final Permissions composed = new PermissionsParser().parse(new HashSet<>(allowed), copyMap(packages), src);
+        return merge(composed);
+    }
+
+    /**
+     * Merges redundant permission rules after composition.
+     * <p>When a wildcard allows a package:</p>
+     * <ul>
+     * <li>Class-level allow entries (JEXL_CLASS) that are subsumed by the wildcard are removed.</li>
+     * <li>NoJexlPackage entries are converted to JexlPackage entries since the wildcard
+     * makes the default behavior allow; deny entries (NOJEXL_CLASS) are preserved as exceptions.</li>
+     * <li>Empty JexlPackage entries are removed since they are fully redundant with the wildcard.</li>
+     * </ul>
+     *
+     * @param permissions the permissions to merge
+     * @return the merged permissions, or the same instance if no merge was needed
+     */
+    private Permissions merge(final Permissions permissions) {
+        final Set<String> wildcards = permissions.getWildcards();
+        if (wildcards.isEmpty()) {
+            return permissions;
+        }
+        final Map<String, NoJexlPackage> pkgMap = permissions.getPackages();
+        if (pkgMap.isEmpty()) {
+            return permissions;
+        }
+        boolean changed = false;
+        final Map<String, NoJexlPackage> merged = new HashMap<>(pkgMap);
+        for (final Map.Entry<String, NoJexlPackage> entry : pkgMap.entrySet()) {
+            final String packageName = entry.getKey();
+            if (!wildcardAllow(wildcards, packageName)) {
+                continue;
+            }
+            final NoJexlPackage pkg = entry.getValue();
+            final Map<String, NoJexlClass> classMap = new HashMap<>(pkg.nojexl);
+            for (final Map.Entry<String, NoJexlClass> classEntry : classMap.entrySet()) {
+                final NoJexlClass njc = classEntry.getValue();
+                if (njc == JEXL_CLASS) {
+                    pkg.addNoJexl(classEntry.getKey(), null);
+                    changed = true;
+                }
+            }
+            if (pkg.isEmpty()) {
+                merged.remove(packageName);
+                changed = true;
+            } else if (!(pkg instanceof JexlPackage)) {
+                merged.put(packageName, new JexlPackage(pkg.nojexl));
+                changed = true;
+            }
+        }
+        return changed ? new Permissions(new HashSet<>(wildcards), merged) : permissions;
     }
 
     /**
