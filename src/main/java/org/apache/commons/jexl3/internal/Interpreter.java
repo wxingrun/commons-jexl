@@ -1767,6 +1767,7 @@ public class Interpreter extends InterpreterBase {
         JexlNode ptyNode = null;
         StringBuilder ant = null;
         boolean antish = !(parent instanceof ASTReference) && options.isAntish();
+        boolean safeNav = false;
         int v = 1;
         main:
         for (int c = 0; c < numChildren; c++) {
@@ -1774,6 +1775,9 @@ public class Interpreter extends InterpreterBase {
             if (objectNode instanceof ASTMethodNode) {
                 antish = false;
                 if (object == null) {
+                    if (safeNav) {
+                        return null;
+                    }
                     // we may be performing a method call on an antish var
                     if (ant != null) {
                         final JexlNode child = objectNode.jjtGetChild(0);
@@ -1796,6 +1800,9 @@ public class Interpreter extends InterpreterBase {
             } else if (objectNode instanceof ASTArrayAccess) {
                 antish = false;
                 if (object == null) {
+                    if (safeNav) {
+                        return null;
+                    }
                     ptyNode = objectNode;
                     break;
                 }
@@ -1831,6 +1838,7 @@ public class Interpreter extends InterpreterBase {
                     }
                     final ASTIdentifierAccess achild = (ASTIdentifierAccess) child;
                     if (achild.isSafe() || achild.isExpression()) {
+                        safeNav = achild.isSafe();
                         break main;
                     }
                     ant.append('.');
@@ -1843,9 +1851,15 @@ public class Interpreter extends InterpreterBase {
                 ptyNode = c == 0 && numChildren > 1 ? node.jjtGetChild(1) : objectNode;
                 break; //
             }
+            if (objectNode instanceof ASTIdentifierAccess && ((ASTIdentifierAccess) objectNode).isSafe()) {
+                safeNav = true;
+            }
         }
         // dealing with null
         if (object == null) {
+            if (safeNav) {
+                return null;
+            }
             if (ptyNode != null) {
                 if (ptyNode.isSafeLhs(isSafe())) {
                     return null;
