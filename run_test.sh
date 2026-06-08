@@ -1,0 +1,3 @@
+#!/bin/bash
+cd /app/commons-jexl
+mvn test -Dtest=ArithmeticTest#testBigIntegerWithLongMixedArithmetic,ArithmeticTest#testLongWithBigIntegerMixedArithmetic,ArithmeticTest#testBigIntegerWithIntegerMixedArithmetic,ArithmeticTest#testBigIntegerBoundaryValues,ArithmeticTest#testBigIntegerWithLongZeroAndOne 2>&1

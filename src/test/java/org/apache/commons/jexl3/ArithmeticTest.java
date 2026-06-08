@@ -1020,6 +1020,68 @@ class ArithmeticTest extends JexlTestCase {
         asserter.assertExpression("right % left", new BigInteger("0"));
     }
 
+    @Test
+    void testBigIntegerWithLongMixedArithmetic() throws Exception {
+        final BigInteger bigValue = new BigInteger("9223372036854775808");
+        asserter.setVariable("big", bigValue);
+        asserter.setVariable("longVal", Long.valueOf(1L));
+        asserter.assertExpression("big + longVal", new BigInteger("9223372036854775809"));
+        asserter.assertExpression("big - longVal", new BigInteger("9223372036854775807"));
+        asserter.assertExpression("big * longVal", bigValue);
+        asserter.assertExpression("big / longVal", bigValue);
+        asserter.assertExpression("big % longVal", BigInteger.ZERO);
+    }
+
+    @Test
+    void testLongWithBigIntegerMixedArithmetic() throws Exception {
+        final BigInteger bigValue = new BigInteger("9223372036854775808");
+        asserter.setVariable("longVal", Long.valueOf(1L));
+        asserter.setVariable("big", bigValue);
+        asserter.assertExpression("longVal + big", new BigInteger("9223372036854775809"));
+        asserter.assertExpression("longVal - big", new BigInteger("-9223372036854775807"));
+        asserter.assertExpression("longVal * big", bigValue);
+        asserter.assertExpression("longVal / big", BigInteger.ZERO);
+        asserter.assertExpression("longVal % big", BigInteger.ONE);
+    }
+
+    @Test
+    void testBigIntegerWithIntegerMixedArithmetic() throws Exception {
+        final BigInteger bigValue = new BigInteger("9223372036854775808");
+        asserter.setVariable("big", bigValue);
+        asserter.setVariable("intVal", Integer.valueOf(100));
+        asserter.assertExpression("big + intVal", new BigInteger("9223372036854775908"));
+        asserter.assertExpression("big - intVal", new BigInteger("9223372036854775708"));
+        asserter.assertExpression("big * intVal", bigValue.multiply(BigInteger.valueOf(100)));
+        asserter.assertExpression("big / intVal", bigValue.divide(BigInteger.valueOf(100)));
+        asserter.assertExpression("big % intVal", bigValue.mod(BigInteger.valueOf(100)));
+    }
+
+    @Test
+    void testBigIntegerBoundaryValues() throws Exception {
+        final BigInteger maxLong = BigInteger.valueOf(Long.MAX_VALUE);
+        final BigInteger minLong = BigInteger.valueOf(Long.MIN_VALUE);
+        asserter.setVariable("maxLong", maxLong);
+        asserter.setVariable("minLong", minLong);
+        asserter.setVariable("one", Long.valueOf(1L));
+        asserter.assertExpression("maxLong + one", BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.ONE));
+        asserter.assertExpression("minLong - one", BigInteger.valueOf(Long.MIN_VALUE).subtract(BigInteger.ONE));
+        asserter.assertExpression("maxLong * 2L", maxLong.multiply(BigInteger.valueOf(2)));
+        asserter.assertExpression("minLong * 2L", minLong.multiply(BigInteger.valueOf(2)));
+    }
+
+    @Test
+    void testBigIntegerWithLongZeroAndOne() throws Exception {
+        final BigInteger bigValue = new BigInteger("123456789012345678901234567890");
+        asserter.setVariable("big", bigValue);
+        asserter.setVariable("zero", Long.valueOf(0L));
+        asserter.setVariable("one", Long.valueOf(1L));
+        asserter.assertExpression("big + zero", bigValue);
+        asserter.assertExpression("big - zero", bigValue);
+        asserter.assertExpression("big * one", bigValue);
+        asserter.assertExpression("big / one", bigValue);
+        asserter.assertExpression("big % one", BigInteger.ZERO);
+    }
+
     // JEXL-24: big integers and big decimals
     @Test
     void testBigLiterals() {
