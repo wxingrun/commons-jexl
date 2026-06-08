@@ -68,4 +68,15 @@ public class MapContext implements JexlContext {
     public void set(final String name, final Object value) {
         map.put(name, value);
     }
+
+    /**
+     * Adds all entries from the given map to the context.
+     * <p>Each key-value pair in the map is added as a variable.</p>
+     *
+     * @param variables the map of variables to add
+     * @throws NullPointerException if variables is null
+     */
+    public void putAll(final Map<String, Object> variables) {
+        map.putAll(variables);
+    }
 }
