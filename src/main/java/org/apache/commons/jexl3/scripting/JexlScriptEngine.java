@@ -455,6 +455,18 @@ public class JexlScriptEngine extends AbstractScriptEngine implements Compilable
         // This is mandated by JSR-223 (see SCR.5.5.2   Methods)
         Objects.requireNonNull(script, "script");
         Objects.requireNonNull(context, CONTEXT_KEY);
+        return executeScript(script, context);
+    }
+
+    /**
+     * Executes a script string within the given script context.
+     *
+     * @param script the script source to execute
+     * @param context the script context for execution
+     * @return the result of script execution
+     * @throws ScriptException if any error occurs during script execution
+     */
+    private Object executeScript(final String script, final ScriptContext context) throws ScriptException {
         // This is mandated by JSR-223 (end of section SCR.4.3.4.1.2 - JexlScript Execution)
         context.setAttribute(CONTEXT_KEY, context, ScriptContext.ENGINE_SCOPE);
         try {
